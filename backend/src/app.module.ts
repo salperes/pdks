@@ -11,6 +11,7 @@ import { AccessLogsModule } from './access-logs/access-logs.module';
 import { DeviceCommModule } from './device-comm/device-comm.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { GatewayModule } from './gateway/gateway.module';
+import { AdmsModule } from './adms/adms.module';
 import { User, Personnel, Location, Device, AccessLog, SyncHistory } from './entities';
 
 @Module({
@@ -39,6 +40,7 @@ import { User, Personnel, Location, Device, AccessLog, SyncHistory } from './ent
     DashboardModule,
     DeviceCommModule,
     GatewayModule,
+    AdmsModule,
   ],
 })
 export class AppModule {}

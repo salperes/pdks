@@ -57,19 +57,23 @@ TypeORM `synchronize: true` (development). Tablolar otomatik olusur.
 - Auth service ilk calistirmada otomatik olusturur
 
 ## ZKTeco Cihazlar (5 adet SC403)
-| Cihaz | IP | Seri No | CommKey | Firmware | Durum |
-|-------|-----|---------|---------|----------|-------|
-| Fabrika 1 | 192.168.88.218 | AJ8O223760445 | (yok) | AJ8O2 | Erisim disi |
-| Fabrika 2 | 192.168.88.217 | AJ8O223760433 | (yok) | AJ8O2 | Calisiyor (UDP) |
-| Merkez Ofis | 192.168.88.219 | 6079214600262 | 202212 | 60792 | CommKey gerekli |
-| Optik Oda | 192.168.88.220 | 6079214600523 | 202212 | 60792 | CommKey gerekli |
-| 4.Ar-Ge Arka Kapi | 192.168.88.221 | AJ8O203360369 | 202212 | AJ8O2 | Erisim disi |
+| Cihaz | IP (Access.mdb) | Seri No | CommPassword | comm_type | Durum |
+|-------|-----------------|---------|-------------|-----------|-------|
+| Fabrika 1 | 192.168.88.218 | AJ8O223760445 | (bos) | 3 (ADMS) | Erisim disi |
+| Fabrika 2 | 192.168.152.233 | AJ8O223760433 | (bos) | 3 (ADMS) | Calisiyor (UDP) |
+| Merkez Ofis | 192.168.104.242 | 6079214600262 | 202212 | 3 (ADMS) | ADMS push modu |
+| Optik Oda | 192.168.104.241 | 6079214600523 | 202212 | 3 (ADMS) | ADMS push modu |
+| 4.Ar-Ge Arka Kapi | 192.168.88.221 | AJ8O203360369 | 202212 | 3 (ADMS) | Erisim disi |
 
-### Cihaz Iletisim Notlari
-- **AJ8O2 firmware**: CommKey olmadan UDP ile calisiyor. `getInfo()` calisiyor.
-- **60792 firmware**: CMD_CONNECT'te CMD_ACK_UNAUTH (2005) donuyor. CommKey = "202212" (Access.mdb'den). Bu cihazlar `getInfo()` desteklemiyor (buffer offset hatasi).
-- **TCP portu 4370**: Dev makineden (192.168.88.24) KAPALI. VM'den (192.168.88.240) ACIK.
-- `zkteco-client.service.ts` CMD_AUTH (1102) destegi eklendi. CommKey uint32 LE olarak gonderiliyor.
+### Cihaz Iletisim Modlari
+- **comm_type=3 = ADMS push modu**: Cihazlar HTTP ile sunucuya baglanir (sunucu cihaza degil!)
+  - Cihaz → `GET /iclock/cdata?SN=...` (config ister)
+  - Cihaz → `POST /iclock/cdata?SN=...&table=ATTLOG` (log gonderir)
+  - Cihaz → `GET /iclock/getrequest?SN=...` (komut bekler)
+- **UDP 4370**: Fabrika 2 calisiyor. Merkez Ofis/Optik Oda CMD_ACK_UNAUTH (2005).
+- **TCP 4370**: Dev makineden KAPALI, VM'den (192.168.88.240) ACIK.
+- **ADMS modulu**: `backend/src/adms/` - ADMS push server endpoint'leri
+- `zkteco-client.service.ts` CMD_AUTH (1102) destegi mevcut (UDP fallback icin).
 - Device `user_id` = Personnel `employeeId` (cardNumber degil!)
 - Senkronizasyon: year < 2000 olan kayitlar atlanir, deviceId + eventTime + deviceUserId ile dedup yapilir.
 
