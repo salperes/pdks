@@ -56,14 +56,14 @@ TypeORM `synchronize: true` (development). Tablolar otomatik olusur.
 - **Password**: Admin123!
 - Auth service ilk calistirmada otomatik olusturur
 
-## ZKTeco Cihazlar (5 adet SC403)
-| Cihaz | IP (Access.mdb) | Seri No | CommPassword | comm_type | Durum |
-|-------|-----------------|---------|-------------|-----------|-------|
-| Fabrika 1 | 192.168.88.218 | AJ8O223760445 | (bos) | 3 (ADMS) | Erisim disi |
-| Fabrika 2 | 192.168.152.233 | AJ8O223760433 | (bos) | 3 (ADMS) | Calisiyor (UDP) |
-| Merkez Ofis | 192.168.104.242 | 6079214600262 | 202212 | 3 (ADMS) | ADMS push modu |
-| Optik Oda | 192.168.104.241 | 6079214600523 | 202212 | 3 (ADMS) | ADMS push modu |
-| 4.Ar-Ge Arka Kapi | 192.168.88.221 | AJ8O203360369 | 202212 | 3 (ADMS) | Erisim disi |
+## ZKTeco Cihazlar (5 adet SC403, firmware Ver 6.60)
+| Cihaz | IP (guncel) | Seri No | CommPassword | comm_type | Durum |
+|-------|------------|---------|--------------|-----------|-------|
+| Fabrika 1 | 192.168.204.233 | AJ8O223760445 | (yok) | 3 (ADMS) | Erisim disi (ping yok) |
+| Fabrika 2 | 192.168.152.233 | AJ8O223760433 | (yok) | 3 (ADMS) | UDP calisiyor, 8 log |
+| Merkez Ofis | 192.168.104.242 | 6079214600262 | 202212 | 3 (ADMS) | ACK_UNAUTH - CommKey calismıyor |
+| Optik Oda | 192.168.104.241 | 6079214600523 | 202212 | 3 (ADMS) | ACK_UNAUTH - CommKey calismıyor |
+| 4.Ar-Ge Arka Kapi | 192.168.107.240 | AJ8O203360369 | 202212 | 3 (ADMS) | Erisim disi (ping yok) |
 
 ### Cihaz Iletisim Modlari
 - **comm_type=3 = ADMS push modu**: Cihazlar HTTP ile sunucuya baglanir (sunucu cihaza degil!)
