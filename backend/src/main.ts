@@ -8,7 +8,7 @@ async function bootstrap() {
 
   // ADMS (iClock) endpoints live at /iclock/* — exclude from API prefix
   app.setGlobalPrefix('api/v1', {
-    exclude: ['iclock/(.*)'],
+    exclude: ['iclock/{*path}'],
   });
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
