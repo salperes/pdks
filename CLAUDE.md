@@ -7,8 +7,9 @@ NestJS backend + React frontend + PostgreSQL veritabani.
 ## Teknoloji Stack
 - **Backend**: NestJS + TypeORM + PostgreSQL + JWT Auth
 - **Frontend**: React + Vite + Tailwind CSS + Zustand
-- **Cihaz Iletisimi**: zkteco-js kutuphanesi (UDP/TCP), port 4370
-- **Veritabani**: PostgreSQL 16 (Docker veya native)
+- **Cihaz Iletisimi**: ADMS push protokolu (HTTP) + zkteco-js (UDP/TCP fallback)
+- **Veritabani**: PostgreSQL 16 (Docker container)
+- **Deployment**: Docker Compose (postgres + backend + frontend/nginx)
 
 ## Proje Yapisi
 ```
@@ -36,19 +37,14 @@ PDKS/
 │       ├── services/api.ts    # Axios + JWT interceptor
 │       ├── store/             # authStore, themeStore (Zustand)
 │       └── types/             # TypeScript interface'ler
-├── docker-compose.yml  # PostgreSQL 16 (port 5433 -> 5432)
+├── docker-compose.yml  # PostgreSQL + Backend + Frontend (tam stack)
 ├── temp/               # ZKAccess3.5 dosyalari (git'e dahil degil)
 └── personel.txt        # Personel listesi (git'e dahil degil)
 ```
 
 ## Veritabani Ayarlari
-```
-DB_HOST=localhost
-DB_PORT=5432        # Docker kullaniliyorsa: 5433
-DB_USERNAME=pdks
-DB_PASSWORD=pdks123
-DB_DATABASE=pdks
-```
+Container icinde: `DB_HOST=postgres`, `DB_PORT=5432` (docker-compose.yml'de tanimli).
+Host'tan erisim: `localhost:5433` (port mapping 5433:5432).
 TypeORM `synchronize: true` (development). Tablolar otomatik olusur.
 
 ## Varsayilan Admin Kullanici
@@ -82,20 +78,41 @@ TypeORM `synchronize: true` (development). Tablolar otomatik olusur.
 - CHECKINOUT tablosu: USERID, CHECKTIME, CHECKTYPE, VERIFYCODE, sn (seri no), MachineId
 - Bu veriler henuz PostgreSQL'e aktarilmadi
 
-## Siradaki Adimlar (VM Uzerinde)
-1. `git clone https://github.com/salperes/pdks.git`
-2. PostgreSQL kur veya `docker-compose up -d` calistir
-3. `cd backend && cp .env.example .env` (DB_PORT'u kontrol et)
-4. `npm install && npm run start:dev`
-5. `cd frontend && npm install && npm run dev`
-6. Cihazlara TCP ile baglanmayi test et (VM'den TCP acik olmali)
-7. CommKey'li cihazlara (Merkez Ofis, Optik Oda) baglanmayi test et
-8. Access.mdb'den 54,954 tarihsel kaydi PostgreSQL'e aktar
-9. Tum cihazlardan canli senkronizasyonu test et
+## Calistirma (Docker Compose)
+```bash
+# Tum servisleri baslat (postgres + backend + frontend)
+docker-compose up -d --build
+
+# Loglari izle
+docker-compose logs -f backend
+
+# Servisleri durdur
+docker-compose down
+```
+- **Frontend**: http://localhost:5174 (nginx, API proxy backend:3000'e yonlendirir)
+- **Backend API**: http://localhost:3000/api/v1
+- **ADMS Endpoint**: http://localhost:3000/iclock/cdata (cihazlar buraya baglanir)
+- **PostgreSQL**: localhost:5433 (host'tan erisim)
+
+### Gelistirme Modu (opsiyonel)
+```bash
+cd backend && npm install && npm run start:dev   # port 3000
+cd frontend && npm install && npm run dev         # port 5173 (Vite proxy aktif)
+```
+
+## Siradaki Adimlar
+1. `docker-compose up -d --build` ile tum stack'i calistir
+2. ADMS endpoint'ini test et: `curl http://localhost:3000/iclock/cdata?SN=TEST`
+3. Cihazlarda ADMS server adresini `http://<host-ip>:3000` olarak ayarla
+4. Access.mdb'den 54,954 tarihsel kaydi PostgreSQL'e aktar
+5. Tum cihazlardan canli ADMS push'u test et
 
 ## Onemli Teknik Detaylar
 - Backend API prefix: `/api/v1` (main.ts'de setGlobalPrefix)
-- Frontend axios baseURL: `http://localhost:3000/api/v1`
+- ADMS endpointleri `/iclock/*` - global prefix'ten haric
+- Frontend nginx: `/api/` ve `/socket.io/` isteklerini backend:3000'e proxy yapar
+- Frontend dev mode: Vite proxy ayarlari `vite.config.ts`'de
+- Frontend axios baseURL: `VITE_API_URL || '/api/v1'` (container'da relative path)
 - JWT: 15dk access token, 7 gun refresh token
 - Device entity'de `commKey` alani var (nullable varchar)
 - DeviceManagerService baslangicta tum aktif cihazlara otomatik baglanir
@@ -103,6 +120,13 @@ TypeORM `synchronize: true` (development). Tablolar otomatik olusur.
 - WebSocket gateway mevcut ama henuz frontend'de kullanilmiyor
 - ZUDP inport range: 5200-5300 (rotate)
 - `getInfo()` opsiyonel - bazi modeller desteklemiyor, hata durumunda atlanir
+
+## Docker Servisleri
+| Servis | Image | Container | Port (host:container) |
+|--------|-------|-----------|----------------------|
+| postgres | postgres:16-alpine | pdks-postgres | 5433:5432 |
+| backend | ./backend (node:20-alpine) | pdks-backend | 3000:3000 |
+| frontend | ./frontend (nginx:alpine) | pdks-frontend | 5174:80 |
 
 ## Git
 - Repo: https://github.com/salperes/pdks.git (private)

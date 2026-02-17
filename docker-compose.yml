@@ -12,5 +12,34 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  backend:
+    build: ./backend
+    container_name: pdks-backend
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: pdks
+      DB_PASSWORD: pdks123
+      DB_DATABASE: pdks
+      JWT_SECRET: pdks-jwt-secret-change-in-production
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_SECRET: pdks-refresh-secret-change-in-production
+      JWT_REFRESH_EXPIRES_IN: 7d
+      PORT: 3000
+    depends_on:
+      - postgres
+
+  frontend:
+    build: ./frontend
+    container_name: pdks-frontend
+    restart: unless-stopped
+    ports:
+      - '5174:80'
+    depends_on:
+      - backend
+
 volumes:
   pgdata:
