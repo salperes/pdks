@@ -1,12 +1,43 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { api } from '../../services/api';
 
 export const LoginPage = () => {
   const { login, isAuthenticated, isLoading, error, clearError } = useAuthStore();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [ssoLoading, setSsoLoading] = useState(false);
+  const [ssoError, setSsoError] = useState<string | null>(null);
+  const ssoAttempted = useRef(false);
+
+  // SSO token yakalama — Portal'dan gelen sso_token parametresini işle
+  useEffect(() => {
+    if (ssoAttempted.current || isAuthenticated) return;
+    const params = new URLSearchParams(window.location.search);
+    const ssoToken = params.get('sso_token');
+    if (!ssoToken) return;
+
+    ssoAttempted.current = true;
+    setSsoLoading(true);
+    setSsoError(null);
+
+    // URL'den token parametresini temizle (replay koruması)
+    window.history.replaceState({}, '', window.location.pathname);
+
+    api.get('/auth/sso', { params: { sso_token: ssoToken } })
+      .then((res) => {
+        const { accessToken, refreshToken, user } = res.data;
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+        useAuthStore.setState({ user, isAuthenticated: true });
+      })
+      .catch((err) => {
+        setSsoError(err.response?.data?.message || 'SSO giriş başarısız');
+      })
+      .finally(() => setSsoLoading(false));
+  }, [isAuthenticated]);
 
   if (isAuthenticated) return <Navigate to="/" replace />;
 
@@ -15,6 +46,18 @@ export const LoginPage = () => {
     clearError();
     login(username, password);
   };
+
+  // SSO işlemi devam ederken loading ekranı göster
+  if (ssoLoading) {
+    return (
+      <div className="min-h-screen bg-[#F0F2F5] dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#0078d4] mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Portal üzerinden giriş yapılıyor...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] dark:bg-gray-900 flex items-center justify-center p-4">
@@ -30,6 +73,13 @@ export const LoginPage = () => {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+          {ssoError && (
+            <div className="mb-4 p-3 bg-[#fde7e9] border-l-4 border-[#a80000] rounded-r-lg flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-[#a80000]" />
+              <span className="text-sm text-[#a80000]">{ssoError}</span>
+            </div>
+          )}
+
           {error && (
             <div className="mb-4 p-3 bg-[#fde7e9] border-l-4 border-[#a80000] rounded-r-lg flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-[#a80000]" />

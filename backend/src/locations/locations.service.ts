@@ -15,6 +15,7 @@ export class LocationsService {
   async findAll(): Promise<(Location & { deviceCount: number })[]> {
     const locations = await this.locationsRepository
       .createQueryBuilder('l')
+      .leftJoinAndSelect('l.workSchedule', 'ws')
       .loadRelationCountAndMap('l.deviceCount', 'l.devices')
       .orderBy('l.name', 'ASC')
       .getMany();

@@ -241,3 +241,221 @@ Rev. Report: (
   Settings/index.tsx)
 )
 ---------------------------------------------------------
+Rev. ID    : 017
+Rev. Date  : 19.02.2026
+Rev. Time  : 10:11:00
+Rev. Prompt: Mesai programları ayrı sayfa + lokasyona atama (WorkSchedule entity)
+
+Rev. Report: (
+  Mesai programları ayrı bir entity ve sayfaya taşındı. Birden fazla şablon
+  oluşturup lokasyonlara atanabilir hale getirildi. Aynı mesai programı birden
+  fazla lokasyona uygulanabilir, merkezi yönetim sağlandı.
+
+  BACKEND — YENİ ENTITY: WorkSchedule
+  - work_schedules tablosu: id (uuid PK), name (unique), workStartTime,
+    workEndTime, isFlexible, flexGraceMinutes, createdAt, updatedAt
+  - Entity: backend/src/entities/work-schedule.entity.ts
+
+  BACKEND — YENİ MODÜL: WorkSchedules
+  - CRUD service: findAll (locationCount dahil), findOne, create, update, remove
+  - Silme koruması: atanmış lokasyonu olan program silinemez
+  - REST controller: GET/POST/PATCH/DELETE /api/v1/work-schedules
+  - DTO: name, workStartTime (@Matches HH:MM), workEndTime, isFlexible,
+    flexGraceMinutes (0-240)
+  - Dosyalar: work-schedules.module.ts, work-schedules.service.ts,
+    work-schedules.controller.ts, dto/create-work-schedule.dto.ts
+
+  BACKEND — LOCATION ENTITY DEĞİŞİKLİĞİ:
+  - 4 inline kolon kaldırıldı: workStartTime, workEndTime, isFlexible,
+    flexGraceMinutes
+  - 1 FK eklendi: workScheduleId (uuid, nullable) → WorkSchedule
+  - @ManyToOne relation (nullable, eager: true)
+  - CreateLocationDto: 4 schedule field → workScheduleId (@IsUUID @IsOptional)
+  - LocationsService.findAll: leftJoinAndSelect('workSchedule') eklendi
+
+  BACKEND — SETTINGS SERVİSİ:
+  - getWorkConfigForLocation(): location.workSchedule?.workStartTime kullanıyor
+  - getAllLocationConfigs(): aynı pattern ile güncellendi
+
+  FRONTEND — YENİ SAYFA: Mesai Programları
+  - Tablo: Ad, Başlangıç, Bitiş, Esnek, Tolerans, Lokasyon Sayısı
+  - Ekle/Düzenle modalı: name, time inputs, esnek toggle, tolerans
+  - Sil butonu (atanmış lokasyon uyarısı)
+  - Route: /admin/work-schedules
+  - Sidebar: Clock ikonu ile "Mesai Programları" menü öğesi
+
+  FRONTEND — LOKASYON SAYFASI:
+  - Inline mesai formu kaldırıldı (toggle, time input'ları)
+  - Yerine: WorkSchedule dropdown (+ "Varsayılan (Global)" seçeneği)
+  - Kartta: atanan programın adı ve saatleri gösteriliyor
+
+  FRONTEND — AYARLAR SAYFASI:
+  - Açıklama metni güncellendi: "Mesai programı atanmamış lokasyonlar bu
+    saatleri kullanır. Lokasyonlara özel mesai programları Mesai Programları
+    sayfasından tanımlanabilir."
+
+  Yeni backend: 5 (work-schedule.entity.ts, work-schedules.module.ts,
+  work-schedules.service.ts, work-schedules.controller.ts,
+  create-work-schedule.dto.ts)
+  Değişen backend: 5 (entities/index.ts, location.entity.ts,
+  create-location.dto.ts, locations.service.ts, settings.service.ts,
+  app.module.ts)
+  Yeni frontend: 1 (WorkSchedules/index.tsx)
+  Değişen frontend: 5 (types/index.ts, Locations/index.tsx, App.tsx,
+  Sidebar.tsx, Settings/index.tsx)
+)
+---------------------------------------------------------
+Rev. ID    : 018
+Rev. Date  : 19.02.2026
+Rev. Time  : 10:55:00
+Rev. Prompt: Mesai hesaplama modu — Brüt/Net seçeneği (WorkSchedule bazlı)
+
+Rev. Report: (
+  Mesai programlarına hesaplama modu seçeneği eklendi. Her program için
+  "Brüt" (ilk giriş / son çıkış) veya "Net" (eşleştirilmiş giriş/çıkış)
+  modu seçilebilir. Net modda gün içindeki molalar otomatik düşülür.
+
+  Örnek: 08:00 IN, 12:00 OUT, 13:00 IN, 17:00 OUT
+  - Brüt: 17:00 - 08:00 = 540dk (9 saat, mola dahil)
+  - Net: (12:00-08:00) + (17:00-13:00) = 480dk (8 saat, mola düşülür)
+
+  BACKEND — WORK SCHEDULE ENTITY:
+  - Yeni kolon: calculation_mode (varchar 10, default 'firstLast')
+  - İki değer: 'firstLast' (brüt) veya 'paired' (net)
+
+  BACKEND — WORK SCHEDULE DTO:
+  - calculationMode alanı eklendi (@IsIn(['firstLast', 'paired']), opsiyonel)
+
+  BACKEND — SETTINGS SERVİSİ:
+  - buildWorkConfig(): calculationMode parametresi ve return değeri eklendi
+  - getWorkConfigForLocation() ve getAllLocationConfigs(): ws.calculationMode geçiriliyor
+
+  BACKEND — REPORTS SERVİSİ:
+  - WorkConfig interface'e calculationMode eklendi
+  - calcPairedMinutes(): IN→OUT çift eşleştirme fonksiyonu (state machine)
+  - processDayLogs(): calculationMode'a göre dallanma — paired ise çift
+    eşleştirme, firstLast ise mevcut ilk giriş/son çıkış mantığı
+
+  BACKEND — ACCESS-LOGS SERVİSİ:
+  - findPaired(): lokasyon bazlı config çözümleme eklendi
+  - calculationMode === 'paired' → IN/OUT çift eşleştirme ile süre hesabı
+  - Response'a calculationMode alanı eklendi
+
+  FRONTEND — TYPES:
+  - WorkSchedule interface'e calculationMode alanı eklendi
+
+  FRONTEND — MESAİ PROGRAMLARI SAYFASI:
+  - Tabloya "Hesaplama" kolonu eklendi (Brüt: mavi badge, Net: mor badge)
+  - Modalda "Hesaplama Modu" radio butonları eklendi:
+    - Brüt (İlk Giriş / Son Çıkış): mavi seçim kutusu
+    - Net (Eşleştirilmiş Giriş/Çıkış): mor seçim kutusu
+  - Her iki seçenek için açıklama metni mevcut
+
+  Değişen backend: 4 (work-schedule.entity.ts, create-work-schedule.dto.ts,
+  settings.service.ts, reports.service.ts, access-logs.service.ts)
+  Değişen frontend: 2 (types/index.ts, WorkSchedules/index.tsx)
+)
+---------------------------------------------------------
+Rev. ID    : 019
+Rev. Date  : 19.02.2026
+Rev. Time  : 14:19:00
+Rev. Prompt: Tarayıcı başlığı ve favicon güncellemesi
+
+Rev. Report: (
+  Tarayıcı sekmesinde görünen uygulama adı "frontend" yerine "PDKS" olarak
+  güncellendi. Favicon olarak MSS göz logosu (mss_eye.png) eklendi.
+
+  FRONTEND:
+  - index.html: <title>frontend</title> → <title>PDKS</title>
+  - index.html: favicon vite.svg → favicon.png (image/png)
+  - public/favicon.png: resources/mss_eye.png kopyalandı
+
+  Değişen frontend: 1 (index.html)
+  Yeni frontend: 1 (public/favicon.png)
+)
+---------------------------------------------------------
+Rev. ID    : 020
+Rev. Date  : 19.02.2026
+Rev. Time  : 14:45:00
+Rev. Prompt: Portal SSO entegrasyonu — tek tıkla giriş
+
+Rev. Report: (
+  Portal uygulamasından SSO ile gelen kullanıcıların PDKS'ye otomatik giriş
+  yapabilmesi sağlandı. Portal, HS256 ile imzalanmış kısa ömürlü (5dk) JWT
+  üretip PDKS URL'sine sso_token parametresi olarak ekliyor. PDKS bu token'ı
+  doğrulayıp kullanıcıyı kendi veritabanında arayarak oturum açıyor.
+
+  BACKEND — ORTAM DEĞİŞKENLERİ:
+  - .env.example: SSO_SECRET_KEY eklendi
+  - docker-compose.yml: backend servisine SSO_SECRET_KEY env var eklendi
+
+  BACKEND — AUTH SERVICE:
+  - loginWithSsoToken(ssoToken): yeni metod
+    1. SSO_SECRET_KEY ile jsonwebtoken.verify (sadece HS256)
+    2. Token'dan username çıkarır
+    3. usersService.findByUsername ile kullanıcı arar
+    4. Kullanıcı yoksa veya pasifse → UnauthorizedException
+    5. Mevcut generateTokens() ile PDKS access + refresh token üretir
+  - Logger eklendi (SSO giriş başarı/başarısız logları)
+
+  BACKEND — AUTH CONTROLLER:
+  - GET /api/v1/auth/sso?sso_token=... endpoint eklendi (public, guard yok)
+  - Başarılı girişte SSO_LOGIN audit log kaydı oluşturulur
+  - Normal login response formatı ile aynı: { accessToken, refreshToken, user }
+
+  FRONTEND — LOGIN SAYFASI:
+  - useEffect ile sso_token query parametresi yakalanıyor
+  - Token varsa: GET /auth/sso çağrılır, başarılıysa token'lar localStorage'a
+    yazılıp authStore güncellenir, Dashboard'a yönlendirilir
+  - URL'den token temizlenir (window.history.replaceState — replay koruması)
+  - SSO işlemi sırasında loading spinner gösteriliyor
+  - Hata durumunda login formu ile birlikte hata mesajı gösteriliyor
+  - useRef ile çift çağrı önleniyor (React strict mode)
+
+  GÜVENLİK:
+  - Sadece HS256 algoritması kabul ediliyor (algorithm confusion koruması)
+  - Token süresi 5dk (Portal tarafında ayarlanır)
+  - PDKS'de kayıtlı olmayan kullanıcı girişi reddediliyor
+  - Otomatik kullanıcı oluşturma YOK
+  - Token URL'den hemen temizleniyor
+
+  PORTAL TARAFINDA GEREKLİ:
+  - SSO_SECRET_KEY paylaşımı (aynı gizli anahtar)
+  - GET /api/integrations/pdks/launch-url endpoint
+  - PDKS kartı eklenmesi (uygulamalar sayfasına)
+
+  Değişen backend: 3 (.env.example, auth.service.ts, auth.controller.ts)
+  Değişen config: 1 (docker-compose.yml)
+  Değişen frontend: 1 (Login/index.tsx)
+)
+---------------------------------------------------------
+Rev. ID    : 016
+Rev. Date  : 19.02.2026
+Rev. Time  : 08:55:00
+Rev. Prompt: Cihaz zaman senkronizasyonu (otomatik saat düzeltme)
+
+Rev. Report: (
+  Sync döngüsüne cihaz zaman kontrolü eklendi. Her senkronizasyonda
+  cihaz saati sunucu saatiyle karşılaştırılıyor, 60 saniyeden fazla
+  sapma varsa otomatik düzeltiliyor.
+
+  ZKTECO CLIENT:
+  - setTime(zk, date) metodu eklendi — cihaz saatini ayarlar
+
+  SYNC SERVICE:
+  - checkAndSyncTime() metodu eklendi — her sync öncesi çalışır
+  - Cihaz saatini getTime() ile okur, UTC+3 offset ile sunucu saatine
+    karşılaştırır
+  - Fark > 60s ise setTime() ile düzeltir, log yazar
+  - Hata olursa attendance sync'i engellemez (try-catch)
+  - TIME_SYNC_THRESHOLD_SECONDS = 60 (eşik değer)
+  - TURKEY_OFFSET_MS = 3 saat (UTC+3)
+
+  TEST SONUÇLARI:
+  - Fabrika 2 (192.168.152.233): drift -1s → düzeltme gerekmedi
+  - Fabrika 1 (192.168.204.233): drift -10123000s (~117 gün geri)
+    → otomatik düzeltildi, sonraki döngüde drift 0s
+
+  Değişen dosyalar: 2 (zkteco-client.service.ts, sync.service.ts)
+)
+---------------------------------------------------------

@@ -1,17 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
-import { MapPin, Plus, Edit, Trash2, X, Building2, Cpu, Clock, ToggleLeft, ToggleRight } from 'lucide-react';
+import { MapPin, Plus, Edit, Trash2, X, Building2, Cpu, Clock } from 'lucide-react';
 import { api } from '../../services/api';
-import type { Location } from '../../types';
+import type { Location, WorkSchedule } from '../../types';
 
 interface LocationForm {
   name: string;
   address: string;
   description: string;
-  useCustomSchedule: boolean;
-  workStartTime: string;
-  workEndTime: string;
-  isFlexible: boolean;
-  flexGraceMinutes: number;
+  workScheduleId: string;
 }
 
 interface Toast {
@@ -24,15 +20,12 @@ const emptyForm: LocationForm = {
   name: '',
   address: '',
   description: '',
-  useCustomSchedule: false,
-  workStartTime: '08:00',
-  workEndTime: '17:00',
-  isFlexible: false,
-  flexGraceMinutes: 60,
+  workScheduleId: '',
 };
 
 export const LocationsPage = () => {
   const [locations, setLocations] = useState<Location[]>([]);
+  const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -50,21 +43,25 @@ export const LocationsPage = () => {
     }, 3000);
   }, []);
 
-  const fetchLocations = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get('/locations');
-      setLocations(res.data);
+      const [locRes, wsRes] = await Promise.all([
+        api.get('/locations'),
+        api.get('/work-schedules'),
+      ]);
+      setLocations(locRes.data);
+      setSchedules(wsRes.data);
     } catch {
-      showToast('Lokasyonlar yüklenirken hata oluştu.', 'error');
+      showToast('Veriler yüklenirken hata oluştu.', 'error');
     } finally {
       setLoading(false);
     }
   }, [showToast]);
 
   useEffect(() => {
-    fetchLocations();
-  }, [fetchLocations]);
+    fetchData();
+  }, [fetchData]);
 
   const openAddModal = () => {
     setEditingId(null);
@@ -74,16 +71,11 @@ export const LocationsPage = () => {
 
   const openEditModal = (loc: Location) => {
     setEditingId(loc.id);
-    const hasCustom = !!(loc.workStartTime && loc.workEndTime);
     setForm({
       name: loc.name,
       address: loc.address || '',
       description: loc.description || '',
-      useCustomSchedule: hasCustom,
-      workStartTime: loc.workStartTime || '08:00',
-      workEndTime: loc.workEndTime || '17:00',
-      isFlexible: loc.isFlexible || false,
-      flexGraceMinutes: loc.flexGraceMinutes || 60,
+      workScheduleId: loc.workScheduleId || '',
     });
     setModalOpen(true);
   };
@@ -103,18 +95,7 @@ export const LocationsPage = () => {
       const payload: Record<string, any> = { name: form.name.trim() };
       if (form.address.trim()) payload.address = form.address.trim();
       if (form.description.trim()) payload.description = form.description.trim();
-
-      if (form.useCustomSchedule) {
-        payload.workStartTime = form.workStartTime;
-        payload.workEndTime = form.workEndTime;
-        payload.isFlexible = form.isFlexible;
-        payload.flexGraceMinutes = form.isFlexible ? form.flexGraceMinutes : null;
-      } else {
-        payload.workStartTime = null;
-        payload.workEndTime = null;
-        payload.isFlexible = false;
-        payload.flexGraceMinutes = null;
-      }
+      payload.workScheduleId = form.workScheduleId || null;
 
       if (editingId) {
         await api.patch(`/locations/${editingId}`, payload);
@@ -124,7 +105,7 @@ export const LocationsPage = () => {
         showToast('Lokasyon başarıyla eklendi.', 'success');
       }
       closeModal();
-      fetchLocations();
+      fetchData();
     } catch {
       showToast(
         editingId
@@ -144,12 +125,22 @@ export const LocationsPage = () => {
       await api.delete(`/locations/${deleteTarget.id}`);
       showToast('Lokasyon başarıyla silindi.', 'success');
       setDeleteTarget(null);
-      fetchLocations();
+      fetchData();
     } catch {
       showToast('Lokasyon silinirken hata oluştu.', 'error');
     } finally {
       setDeleting(false);
     }
+  };
+
+  const getScheduleLabel = (loc: Location) => {
+    const ws = loc.workSchedule;
+    if (!ws) return null;
+    return {
+      name: ws.name,
+      time: `${ws.workStartTime}–${ws.workEndTime}`,
+      flex: ws.isFlexible ? (ws.flexGraceMinutes ? `Esnek ${ws.flexGraceMinutes}dk` : 'Esnek') : null,
+    };
   };
 
   return (
@@ -215,94 +206,98 @@ export const LocationsPage = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {locations.map((loc) => (
-            <div
-              key={loc.id}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-5 flex flex-col"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
-                    <MapPin className="w-4 h-4 text-[#0078d4]" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {loc.name}
-                    </h3>
-                    {loc.address && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        {loc.address}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <span
-                  className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                    loc.isActive
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                      : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
-                  }`}
-                >
-                  {loc.isActive ? 'Aktif' : 'Pasif'}
-                </span>
-              </div>
-
-              {loc.description && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">
-                  {loc.description}
-                </p>
-              )}
-
-              {/* Mesai bilgisi */}
-              <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-3">
-                <Clock className="w-3.5 h-3.5" />
-                <span>
-                  {loc.workStartTime && loc.workEndTime ? (
-                    <>
-                      <span className="font-medium text-gray-700 dark:text-gray-300">
-                        {loc.workStartTime}–{loc.workEndTime}
-                      </span>
-                      {loc.isFlexible && (
-                        <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">
-                          (Esnek{loc.flexGraceMinutes ? ` ${loc.flexGraceMinutes}dk` : ''})
-                        </span>
+          {locations.map((loc) => {
+            const sched = getScheduleLabel(loc);
+            return (
+              <div
+                key={loc.id}
+                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-5 flex flex-col"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                      <MapPin className="w-4 h-4 text-[#0078d4]" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {loc.name}
+                      </h3>
+                      {loc.address && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          {loc.address}
+                        </p>
                       )}
-                    </>
-                  ) : (
-                    <span className="text-gray-400 dark:text-gray-500">Varsayılan mesai</span>
-                  )}
-                </span>
-              </div>
-
-              <div className="mt-auto pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  <Cpu className="w-3.5 h-3.5" />
-                  <span>
-                    Cihaz Sayısı:{' '}
-                    <span className="font-medium text-gray-700 dark:text-gray-300">
-                      {loc.devicesCount ?? 0}
-                    </span>
+                    </div>
+                  </div>
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      loc.isActive
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                    }`}
+                  >
+                    {loc.isActive ? 'Aktif' : 'Pasif'}
                   </span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => openEditModal(loc)}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-[#0078d4] hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                    title="Düzenle"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setDeleteTarget(loc)}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                    title="Sil"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+
+                {loc.description && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">
+                    {loc.description}
+                  </p>
+                )}
+
+                {/* Mesai bilgisi */}
+                <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>
+                    {sched ? (
+                      <>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">
+                          {sched.name}
+                        </span>
+                        <span className="ml-1 text-gray-400">({sched.time})</span>
+                        {sched.flex && (
+                          <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">
+                            {sched.flex}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-gray-400 dark:text-gray-500">Varsayılan mesai</span>
+                    )}
+                  </span>
+                </div>
+
+                <div className="mt-auto pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    <Cpu className="w-3.5 h-3.5" />
+                    <span>
+                      Cihaz Sayısı:{' '}
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        {loc.devicesCount ?? 0}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => openEditModal(loc)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-[#0078d4] hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                      title="Düzenle"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(loc)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      title="Sil"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -364,111 +359,28 @@ export const LocationsPage = () => {
                 />
               </div>
 
-              {/* Mesai Programı */}
+              {/* Mesai Programı Dropdown */}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-[#0078d4]" />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Mesai Programı
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setForm({ ...form, useCustomSchedule: !form.useCustomSchedule })}
-                    className="text-[#0078d4] hover:opacity-80 transition-opacity"
-                  >
-                    {form.useCustomSchedule ? (
-                      <ToggleRight className="w-7 h-7" />
-                    ) : (
-                      <ToggleLeft className="w-7 h-7 text-gray-400" />
-                    )}
-                  </button>
-                </div>
-
-                {!form.useCustomSchedule ? (
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Varsayılan mesai saatleri kullanılacak. Özel mesai tanımlamak için
-                    toggle'ı aktifleştirin.
-                  </p>
-                ) : (
-                  <div className="space-y-3 bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                          Mesai Başlangıcı
-                        </label>
-                        <input
-                          type="time"
-                          value={form.workStartTime}
-                          onChange={(e) => setForm({ ...form, workStartTime: e.target.value })}
-                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0078d4] focus:border-transparent outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                          Mesai Bitişi
-                        </label>
-                        <input
-                          type="time"
-                          value={form.workEndTime}
-                          onChange={(e) => setForm({ ...form, workEndTime: e.target.value })}
-                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0078d4] focus:border-transparent outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Esnek Mesai */}
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-                      <div>
-                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                          Esnek Mesai
-                        </span>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          Giriş toleransı, çıkış girişe göre hesaplanır
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setForm({ ...form, isFlexible: !form.isFlexible })}
-                        className="text-[#0078d4] hover:opacity-80 transition-opacity"
-                      >
-                        {form.isFlexible ? (
-                          <ToggleRight className="w-7 h-7" />
-                        ) : (
-                          <ToggleLeft className="w-7 h-7 text-gray-400" />
-                        )}
-                      </button>
-                    </div>
-
-                    {form.isFlexible && (
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                          Giriş Toleransı (dakika)
-                        </label>
-                        <input
-                          type="number"
-                          min={0}
-                          max={240}
-                          value={form.flexGraceMinutes}
-                          onChange={(e) =>
-                            setForm({ ...form, flexGraceMinutes: Number(e.target.value) })
-                          }
-                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0078d4] focus:border-transparent outline-none"
-                        />
-                        <p className="text-xs text-gray-400 mt-1">
-                          Örn: 60 dk tolerans ile {form.workStartTime}–
-                          {(() => {
-                            const [h, m] = form.workStartTime.split(':').map(Number);
-                            const t = h * 60 + m + form.flexGraceMinutes;
-                            return `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
-                          })()}{' '}
-                          arası giriş geç sayılmaz
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <Clock className="w-4 h-4 text-[#0078d4]" />
+                  Mesai Programı
+                </label>
+                <select
+                  value={form.workScheduleId}
+                  onChange={(e) => setForm({ ...form, workScheduleId: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0078d4] focus:border-transparent outline-none transition-colors"
+                >
+                  <option value="">Varsayılan (Global Ayarlar)</option>
+                  {schedules.map((ws) => (
+                    <option key={ws.id} value={ws.id}>
+                      {ws.name} ({ws.workStartTime}–{ws.workEndTime}
+                      {ws.isFlexible ? ', Esnek' : ''})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  Mesai programı atanmamışsa global varsayılan saatler kullanılır
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">

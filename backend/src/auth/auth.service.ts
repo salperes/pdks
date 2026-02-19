@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -10,6 +10,7 @@ import { JwtPayload } from './jwt.strategy';
 @Injectable()
 export class AuthService {
   private readonly SALT_ROUNDS = 10;
+  private readonly logger = new Logger(AuthService.name);
 
   constructor(
     private readonly usersService: UsersService,
@@ -85,6 +86,45 @@ export class AuthService {
 
     user.passwordHash = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
     await this.usersService.saveUser(user);
+  }
+
+  async loginWithSsoToken(ssoToken: string): Promise<AuthResponse> {
+    const ssoSecret = this.configService.get<string>('SSO_SECRET_KEY');
+    if (!ssoSecret) {
+      throw new UnauthorizedException('SSO yapılandırması eksik');
+    }
+
+    let payload: { username: string; email?: string };
+    try {
+      payload = await this.jwtService.verifyAsync<{ username: string; email?: string }>(
+        ssoToken,
+        { secret: ssoSecret, algorithms: ['HS256'] },
+      );
+    } catch (err: any) {
+      this.logger.warn(`SSO token doğrulama hatası: ${err.message}`);
+      throw new UnauthorizedException('Geçersiz veya süresi dolmuş SSO token');
+    }
+
+    if (!payload.username) {
+      throw new UnauthorizedException('SSO token içinde kullanıcı adı bulunamadı');
+    }
+
+    const user = await this.usersService.findByUsername(payload.username);
+    if (!user) {
+      this.logger.warn(`SSO: Kullanıcı bulunamadı — ${payload.username}`);
+      throw new UnauthorizedException('Bu kullanıcı PDKS sisteminde kayıtlı değil');
+    }
+
+    if (!user.isActive) {
+      this.logger.warn(`SSO: Pasif kullanıcı girişi engellendi — ${payload.username}`);
+      throw new UnauthorizedException('Kullanıcı hesabı pasif durumda');
+    }
+
+    this.logger.log(`SSO giriş başarılı: ${payload.username}`);
+    const tokens = await this.generateTokens(user);
+    const authUser = this.toAuthUser(user);
+
+    return { ...tokens, user: authUser };
   }
 
   async hashPassword(password: string): Promise<string> {

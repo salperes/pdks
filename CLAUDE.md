@@ -1,6 +1,6 @@
 # PDKS - Personel Devam Kontrol Sistemi
 
-## Mevcut Versiyon: 1.0.015
+## Mevcut Versiyon: 1.0.020
 
 ## Proje Ozeti
 ZKTeco SC403 kart okuyucu terminallerle entegre personel devam kontrol sistemi.
@@ -57,7 +57,7 @@ TypeORM `synchronize: true` (development). Tablolar otomatik olusur.
 ## ZKTeco Cihazlar (5 adet SC403, firmware Ver 6.60)
 | Cihaz | IP (guncel) | Seri No | CommPassword | comm_type | Durum |
 |-------|------------|---------|--------------|-----------|-------|
-| Fabrika 1 | 192.168.204.233 | AJ8O223760445 | (yok) | 3 (ADMS) | Erisim disi (ping yok) |
+| Fabrika 1 | 192.168.204.233 | AJ8O223760445 | (yok) | 3 (ADMS) | UDP calisiyor, 92 user, 1 log |
 | Fabrika 2 | 192.168.152.233 | AJ8O223760433 | (yok) | 3 (ADMS) | UDP calisiyor (prod'dan erisim var) |
 | Merkez Ofis | 192.168.104.242 | 6079214600262 | 202212 | 3 (ADMS) | UDP calisiyor (prod'dan CommKey auth basarili) |
 | Optik Oda | 192.168.104.241 | 6079214600523 | 202212 | 3 (ADMS) | UDP calisiyor (prod'dan CommKey auth basarili) |

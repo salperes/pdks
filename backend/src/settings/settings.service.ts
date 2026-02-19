@@ -65,6 +65,7 @@ export class SettingsService {
     timezoneOffset: number,
     isFlexible = false,
     flexGraceMinutes: number | null = null,
+    calculationMode: 'firstLast' | 'paired' = 'firstLast',
   ) {
     const [sh, sm] = startTime.split(':').map(Number);
     const [eh, em] = endTime.split(':').map(Number);
@@ -84,6 +85,7 @@ export class SettingsService {
       isFlexible,
       flexGraceMinutes: flexGraceMinutes ?? null,
       shiftDurationMinutes: (eh * 60 + em) - (sh * 60 + sm),
+      calculationMode,
     };
   }
 
@@ -96,14 +98,19 @@ export class SettingsService {
     const globalSettings = await this.getSettings();
 
     if (locationId) {
-      const location = await this.locationRepo.findOneBy({ id: locationId });
-      if (location?.workStartTime && location?.workEndTime) {
+      const location = await this.locationRepo.findOne({
+        where: { id: locationId },
+        relations: ['workSchedule'],
+      });
+      const ws = location?.workSchedule;
+      if (ws?.workStartTime && ws?.workEndTime) {
         return this.buildWorkConfig(
-          location.workStartTime,
-          location.workEndTime,
+          ws.workStartTime,
+          ws.workEndTime,
           globalSettings.timezoneOffset,
-          location.isFlexible,
-          location.flexGraceMinutes,
+          ws.isFlexible,
+          ws.flexGraceMinutes,
+          ws.calculationMode ?? 'firstLast',
         );
       }
     }
@@ -126,13 +133,15 @@ export class SettingsService {
 
     const map = new Map<string, ReturnType<SettingsService['buildWorkConfig']>>();
     for (const loc of locations) {
-      if (loc.workStartTime && loc.workEndTime) {
+      const ws = loc.workSchedule;
+      if (ws?.workStartTime && ws?.workEndTime) {
         map.set(loc.id, this.buildWorkConfig(
-          loc.workStartTime,
-          loc.workEndTime,
+          ws.workStartTime,
+          ws.workEndTime,
           globalSettings.timezoneOffset,
-          loc.isFlexible,
-          loc.flexGraceMinutes,
+          ws.isFlexible,
+          ws.flexGraceMinutes,
+          ws.calculationMode ?? 'firstLast',
         ));
       }
     }

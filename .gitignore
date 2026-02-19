@@ -16,6 +16,7 @@ temp/
 # Sensitive data
 personel.txt
 *.mdb
+data/
 
 # IDE
 .vscode/

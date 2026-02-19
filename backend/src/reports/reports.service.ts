@@ -18,6 +18,7 @@ interface WorkConfig {
   isFlexible: boolean;
   flexGraceMinutes: number | null;
   shiftDurationMinutes: number;
+  calculationMode: 'firstLast' | 'paired';
 }
 
 /* ---------- helpers ---------- */
@@ -93,6 +94,27 @@ interface DayResult {
   punchCount: number;
 }
 
+/** Paired (net) calculation: match each IN with the next OUT, sum durations */
+function calcPairedMinutes(logs: AccessLog[]): number {
+  const sorted = [...logs].sort(
+    (a, b) => new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime(),
+  );
+  let total = 0;
+  let openIn: Date | null = null;
+  for (const log of sorted) {
+    if (log.direction === 'in') {
+      if (!openIn) openIn = new Date(log.eventTime);
+    } else if (log.direction === 'out' && openIn) {
+      const outTime = new Date(log.eventTime);
+      if (outTime > openIn) {
+        total += (outTime.getTime() - openIn.getTime()) / 60000;
+      }
+      openIn = null;
+    }
+  }
+  return total;
+}
+
 function processDayLogs(logs: AccessLog[], cfg: WorkConfig): DayResult {
   const inLogs = logs.filter((l) => l.direction === 'in');
   const outLogs = logs.filter((l) => l.direction === 'out');
@@ -103,8 +125,12 @@ function processDayLogs(logs: AccessLog[], cfg: WorkConfig): DayResult {
     outLogs.length > 0 ? new Date(outLogs[outLogs.length - 1].eventTime) : null;
 
   let totalMinutes = 0;
-  if (firstIn && lastOut && lastOut > firstIn) {
-    totalMinutes = (lastOut.getTime() - firstIn.getTime()) / 60000;
+  if (cfg.calculationMode === 'paired') {
+    totalMinutes = calcPairedMinutes(logs);
+  } else {
+    if (firstIn && lastOut && lastOut > firstIn) {
+      totalMinutes = (lastOut.getTime() - firstIn.getTime()) / 60000;
+    }
   }
 
   return {

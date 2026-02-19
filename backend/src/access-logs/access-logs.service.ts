@@ -180,12 +180,18 @@ export class AccessLogsService {
       lastOut: string | null;
       durationMinutes: number | null;
       totalEvents: number;
+      calculationMode: string;
     }[] = [];
 
     for (const [pid, pLogs] of grouped) {
       const p = pLogs[0].personnel;
       const name = p ? `${p.firstName} ${p.lastName}` : `ID: ${pid}`;
       const dept = p?.department || '';
+
+      // Lokasyon bazlı hesaplama modu
+      const locId = pLogs[0].locationId || null;
+      const locCfg = await this.settingsService.getWorkConfigForLocation(locId);
+      const mode = locCfg.calculationMode || 'firstLast';
 
       const inLogs = pLogs.filter((l) => l.direction === 'in');
       const outLogs = pLogs.filter((l) => l.direction === 'out');
@@ -194,10 +200,29 @@ export class AccessLogsService {
       const lastOut = outLogs.length > 0 ? outLogs[outLogs.length - 1].eventTime : null;
 
       let durationMinutes: number | null = null;
-      if (firstIn && lastOut && lastOut > firstIn) {
-        durationMinutes = Math.round(
-          (new Date(lastOut).getTime() - new Date(firstIn).getTime()) / 60000,
-        );
+      if (mode === 'paired') {
+        // Net: IN→OUT çift eşleştirmesi
+        let total = 0;
+        let openIn: Date | null = null;
+        for (const log of pLogs) {
+          if (log.direction === 'in') {
+            if (!openIn) openIn = new Date(log.eventTime);
+          } else if (log.direction === 'out' && openIn) {
+            const outTime = new Date(log.eventTime);
+            if (outTime > openIn) {
+              total += (outTime.getTime() - openIn.getTime()) / 60000;
+            }
+            openIn = null;
+          }
+        }
+        durationMinutes = total > 0 ? Math.round(total) : null;
+      } else {
+        // Brüt: ilk giriş → son çıkış
+        if (firstIn && lastOut && lastOut > firstIn) {
+          durationMinutes = Math.round(
+            (new Date(lastOut).getTime() - new Date(firstIn).getTime()) / 60000,
+          );
+        }
       }
 
       pairs.push({
@@ -208,6 +233,7 @@ export class AccessLogsService {
         lastOut: lastOut ? new Date(lastOut).toISOString() : null,
         durationMinutes,
         totalEvents: pLogs.length,
+        calculationMode: mode,
       });
     }
 

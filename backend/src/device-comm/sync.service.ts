@@ -5,6 +5,11 @@ import { Interval } from '@nestjs/schedule';
 import { Device, AccessLog, Personnel, SyncHistory } from '../entities';
 import { ZktecoClientService } from './zkteco-client.service';
 
+// Time drift threshold in seconds — correct device clock if off by more than this
+const TIME_SYNC_THRESHOLD_SECONDS = 60;
+// Turkey timezone offset (UTC+3) in milliseconds
+const TURKEY_OFFSET_MS = 3 * 60 * 60 * 1000;
+
 @Injectable()
 export class SyncService {
   private readonly logger = new Logger(SyncService.name);
@@ -82,6 +87,9 @@ export class SyncService {
         device.commKey || undefined,
       );
 
+      // Time sync: check device clock and correct if drifted
+      await this.checkAndSyncTime(zk, device);
+
       const attendanceData = await this.zktecoClient.getAttendances(zk);
       const logs: any[] = attendanceData?.data ?? [];
       this.logger.debug(`${device.name}: getAttendances returned ${logs.length} record(s)`);
@@ -117,6 +125,38 @@ export class SyncService {
       if (zk) {
         await this.zktecoClient.disconnect(zk);
       }
+    }
+  }
+
+  private async checkAndSyncTime(zk: any, device: Device): Promise<void> {
+    try {
+      const deviceTime = await this.zktecoClient.getTime(zk);
+      if (!deviceTime) {
+        this.logger.debug(`${device.name}: getTime returned null, skipping time sync`);
+        return;
+      }
+
+      // deviceTime is device's local clock (Turkey UTC+3), parsed as UTC by the library.
+      // Convert to real UTC by subtracting the offset, then compare with server UTC.
+      const deviceUtcMs = deviceTime.getTime() - TURKEY_OFFSET_MS;
+      const serverUtcMs = Date.now();
+      const driftSeconds = Math.round((deviceUtcMs - serverUtcMs) / 1000);
+
+      if (Math.abs(driftSeconds) > TIME_SYNC_THRESHOLD_SECONDS) {
+        // Device clock is off — correct it.
+        // setTime expects a Date in the library's convention (local time as UTC).
+        const serverLocalDate = new Date(serverUtcMs + TURKEY_OFFSET_MS);
+        this.logger.warn(
+          `${device.name}: clock drift detected: ${driftSeconds > 0 ? '+' : ''}${driftSeconds}s — correcting to server time`,
+        );
+        await this.zktecoClient.setTime(zk, serverLocalDate);
+        this.logger.log(`${device.name}: device clock corrected successfully`);
+      } else {
+        this.logger.debug(`${device.name}: clock OK (drift: ${driftSeconds}s)`);
+      }
+    } catch (error) {
+      // Time sync failure should not block attendance sync
+      this.logger.warn(`${device.name}: time sync check failed: ${error?.message}`);
     }
   }
 

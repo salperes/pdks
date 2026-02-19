@@ -5,6 +5,8 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Query,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators';
@@ -61,6 +63,22 @@ export class AuthController {
       targetId: user.id,
     });
     return { message: 'Şifre başarıyla değiştirildi' };
+  }
+
+  @Get('sso')
+  async ssoLogin(@Query('sso_token') ssoToken: string): Promise<AuthResponse> {
+    if (!ssoToken) {
+      throw new UnauthorizedException('SSO token gerekli');
+    }
+    const result = await this.authService.loginWithSsoToken(ssoToken);
+    this.auditLogService.log({
+      action: 'SSO_LOGIN',
+      userId: result.user.id,
+      username: result.user.username,
+      targetEntity: 'User',
+      targetId: result.user.id,
+    });
+    return result;
   }
 
   @Get('me')

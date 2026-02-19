@@ -448,6 +448,15 @@ export class ZktecoClientService {
             throw error;
         }
     }
+    async setTime(zk, date: Date) {
+        try {
+            return await zk.setTime(date);
+        }
+        catch (error) {
+            this.logger.error('Failed to set device time', error);
+            throw error;
+        }
+    }
     async getAttendances(zk) {
         try {
             const udp = this.getUdpClient(zk);

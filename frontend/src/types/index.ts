@@ -27,6 +27,17 @@ export interface Personnel {
   lastDirection?: 'in' | 'out';
 }
 
+export interface WorkSchedule {
+  id: string;
+  name: string;
+  workStartTime: string;
+  workEndTime: string;
+  isFlexible: boolean;
+  flexGraceMinutes: number | null;
+  calculationMode: 'firstLast' | 'paired';
+  locationCount?: number;
+}
+
 export interface Location {
   id: string;
   name: string;
@@ -34,10 +45,8 @@ export interface Location {
   description?: string;
   isActive: boolean;
   devicesCount?: number;
-  workStartTime?: string | null;
-  workEndTime?: string | null;
-  isFlexible?: boolean;
-  flexGraceMinutes?: number | null;
+  workScheduleId?: string | null;
+  workSchedule?: WorkSchedule | null;
 }
 
 export interface Device {

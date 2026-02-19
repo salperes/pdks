@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './store/authStore';
 import { Layout } from './components/layout/Layout';
@@ -12,6 +12,7 @@ import { UsersPage } from './pages/Admin/Users';
 import { ReportsPage } from './pages/Reports';
 import { SettingsPage } from './pages/Settings';
 import { SupervisorPage } from './pages/Supervisor';
+import { WorkSchedulesPage } from './pages/WorkSchedules';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -19,7 +20,12 @@ const queryClient = new QueryClient({
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuthStore();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  if (!isAuthenticated) {
+    // SSO token parametresini login sayfasına taşı
+    const loginPath = location.search ? `/login${location.search}` : '/login';
+    return <Navigate to={loginPath} replace />;
+  }
   return <>{children}</>;
 };
 
@@ -45,6 +51,7 @@ function App() {
             <Route path="supervisor" element={<SupervisorPage />} />
             <Route path="locations" element={<LocationsPage />} />
             <Route path="admin/users" element={<UsersPage />} />
+            <Route path="admin/work-schedules" element={<WorkSchedulesPage />} />
             <Route path="admin/settings" element={<SettingsPage />} />
           </Route>
         </Routes>

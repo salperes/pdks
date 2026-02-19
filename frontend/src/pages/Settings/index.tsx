@@ -343,8 +343,8 @@ export const SettingsPage = () => {
             </h2>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 -mt-2">
-            Özel mesai tanımlı olmayan lokasyonlar bu saatleri kullanır.
-            Lokasyon bazlı mesai saatleri Lokasyon Yönetimi sayfasından ayarlanabilir.
+            Mesai programı atanmamış lokasyonlar bu saatleri kullanır.
+            Lokasyonlara özel mesai programları Mesai Programları sayfasından tanımlanabilir.
           </p>
           {settingsLoading ? (
             <div className="flex items-center gap-2 py-8">

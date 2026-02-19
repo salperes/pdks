@@ -7,6 +7,7 @@ import {
   MapPin,
   BarChart3,
   ShieldCheck,
+  Clock,
   Settings,
   LogOut,
   type LucideIcon,
@@ -30,6 +31,7 @@ const adminItems: NavItem[] = [
   { path: '/devices', icon: Cpu, label: 'Cihazlar' },
   { path: '/supervisor', icon: ShieldCheck, label: 'Erişim Yönetimi' },
   { path: '/locations', icon: MapPin, label: 'Lokasyonlar' },
+  { path: '/admin/work-schedules', icon: Clock, label: 'Mesai Programları' },
   { path: '/admin/users', icon: Users, label: 'Kullanıcılar' },
   { path: '/admin/settings', icon: Settings, label: 'Ayarlar' },
 ];

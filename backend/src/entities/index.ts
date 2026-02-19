@@ -9,3 +9,4 @@ export { Holiday } from './holiday.entity';
 export { AuditLog } from './audit-log.entity';
 export { BackupHistory } from './backup-history.entity';
 export { PersonnelDevice } from './personnel-device.entity';
+export { WorkSchedule } from './work-schedule.entity';

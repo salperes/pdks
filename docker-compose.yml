@@ -25,6 +25,7 @@ services:
       JWT_REFRESH_SECRET: pdks-refresh-secret-change-in-production
       JWT_REFRESH_EXPIRES_IN: 7d
       PORT: 3000
+      SSO_SECRET_KEY: change-this-sso-secret-in-production
     depends_on:
       - postgres
 
