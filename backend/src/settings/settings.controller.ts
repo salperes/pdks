@@ -42,6 +42,24 @@ export class SettingsController {
       workEndTime?: string;
       timezoneOffset?: number;
       syncInterval?: number;
+      backupEnabled?: boolean;
+      backupRetentionDays?: number;
+      smtpHost?: string;
+      smtpPort?: number;
+      smtpSecurity?: string;
+      smtpUsername?: string;
+      smtpPassword?: string;
+      smtpFromAddress?: string;
+      smtpFromName?: string;
+      emailEnabled?: boolean;
+      notifyAbsenceEnabled?: boolean;
+      notifyAbsenceRecipients?: string[];
+      notifyAbsenceTime?: string;
+      notifyHrEnabled?: boolean;
+      notifyHrRecipients?: string[];
+      notifyHrTime?: string;
+      notifySystemErrorEnabled?: boolean;
+      notifySystemErrorRecipients?: string[];
     },
   ) {
     const result = await this.settingsService.updateSettings(data);

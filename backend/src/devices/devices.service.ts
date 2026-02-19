@@ -46,9 +46,9 @@ export class DevicesService {
   }
 
   async update(id: string, dto: UpdateDeviceDto): Promise<Device> {
-    const device = await this.findById(id);
-    Object.assign(device, dto);
-    return this.devicesRepository.save(device);
+    await this.findById(id); // varlık kontrolü
+    await this.devicesRepository.update(id, dto);
+    return this.findById(id);
   }
 
   async updateOnlineStatus(id: string, isOnline: boolean): Promise<void> {

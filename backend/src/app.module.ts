@@ -19,7 +19,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { BackupModule } from './backup/backup.module';
 import { SupervisorModule } from './supervisor/supervisor.module';
 import { WorkSchedulesModule } from './work-schedules/work-schedules.module';
-import { User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettings, Holiday, AuditLog, BackupHistory, PersonnelDevice, WorkSchedule } from './entities';
+import { EmailModule } from './email/email.module';
+import { User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettings, Holiday, AuditLog, BackupHistory, PersonnelDevice, WorkSchedule, EmailLog } from './entities';
 
 @Module({
   imports: [
@@ -33,7 +34,7 @@ import { User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettin
         username: config.get('DB_USERNAME', 'pdks'),
         password: config.get('DB_PASSWORD', 'pdks123'),
         database: config.get('DB_DATABASE', 'pdks'),
-        entities: [User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettings, Holiday, AuditLog, BackupHistory, PersonnelDevice, WorkSchedule],
+        entities: [User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettings, Holiday, AuditLog, BackupHistory, PersonnelDevice, WorkSchedule, EmailLog],
         synchronize: true, // DEV only
       }),
     }),
@@ -55,6 +56,7 @@ import { User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettin
     BackupModule,
     SupervisorModule,
     WorkSchedulesModule,
+    EmailModule,
   ],
 })
 export class AppModule {}

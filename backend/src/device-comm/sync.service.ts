@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Interval } from '@nestjs/schedule';
 import { Device, AccessLog, Personnel, SyncHistory } from '../entities';
 import { ZktecoClientService } from './zkteco-client.service';
+import { EmailService } from '../email/email.service';
 
 // Time drift threshold in seconds — correct device clock if off by more than this
 const TIME_SYNC_THRESHOLD_SECONDS = 60;
@@ -25,6 +26,7 @@ export class SyncService {
     @InjectRepository(SyncHistory)
     private readonly syncHistoryRepository: Repository<SyncHistory>,
     private readonly zktecoClient: ZktecoClientService,
+    private readonly emailService: EmailService,
   ) {}
 
   @Interval(120_000)
@@ -61,6 +63,12 @@ export class SyncService {
           }
         } catch (error) {
           this.logger.warn(`Failed to sync ${device.name} (${device.ipAddress}): ${error?.message}`);
+          this.emailService.sendSystemErrorNotification({
+            deviceName: device.name,
+            deviceId: device.id,
+            errorType: 'Cihaz Senkronizasyon Hatası',
+            message: error?.message ?? 'Bilinmeyen hata',
+          }).catch(() => {});
         }
       }
     } finally {

@@ -41,6 +41,10 @@ export class SettingsService {
       });
       await this.settingsRepo.save(row);
     }
+    // API yanıtında SMTP şifresini maskele
+    if (row.smtpPassword) {
+      row = { ...row, smtpPassword: '********' };
+    }
     return row;
   }
 
@@ -48,13 +52,29 @@ export class SettingsService {
     data: Partial<
       Pick<
         SystemSettings,
-        'workStartTime' | 'workEndTime' | 'timezoneOffset' | 'syncInterval' | 'backupEnabled' | 'backupRetentionDays'
+        | 'workStartTime' | 'workEndTime' | 'timezoneOffset' | 'syncInterval'
+        | 'backupEnabled' | 'backupRetentionDays'
+        | 'smtpHost' | 'smtpPort' | 'smtpSecurity' | 'smtpUsername' | 'smtpPassword'
+        | 'smtpFromAddress' | 'smtpFromName' | 'emailEnabled'
+        | 'notifyAbsenceEnabled' | 'notifyAbsenceRecipients' | 'notifyAbsenceTime'
+        | 'notifyHrEnabled' | 'notifyHrRecipients' | 'notifyHrTime'
+        | 'notifySystemErrorEnabled' | 'notifySystemErrorRecipients'
       >
     >,
   ): Promise<SystemSettings> {
-    const row = await this.getSettings();
+    // Maskelenmiş şifreyi geri yazmayı önle
+    const raw = await this.settingsRepo.findOneBy({ id: 'default' });
+    if (data.smtpPassword === '********') {
+      delete data.smtpPassword;
+    }
+    const row = raw ?? (await this.getSettings());
     Object.assign(row, data);
-    return this.settingsRepo.save(row);
+    const saved = await this.settingsRepo.save(row);
+    // Yanıtta şifreyi maskele
+    if (saved.smtpPassword) {
+      return { ...saved, smtpPassword: '********' };
+    }
+    return saved;
   }
 
   /* ── Work Config ────────────────────────── */

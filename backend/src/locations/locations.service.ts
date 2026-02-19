@@ -12,15 +12,15 @@ export class LocationsService {
     private readonly locationsRepository: Repository<Location>,
   ) {}
 
-  async findAll(): Promise<(Location & { deviceCount: number })[]> {
+  async findAll(): Promise<(Location & { devicesCount: number })[]> {
     const locations = await this.locationsRepository
       .createQueryBuilder('l')
       .leftJoinAndSelect('l.workSchedule', 'ws')
-      .loadRelationCountAndMap('l.deviceCount', 'l.devices')
+      .loadRelationCountAndMap('l.devicesCount', 'l.devices')
       .orderBy('l.name', 'ASC')
       .getMany();
 
-    return locations as (Location & { deviceCount: number })[];
+    return locations as (Location & { devicesCount: number })[];
   }
 
   async findById(id: string): Promise<Location> {

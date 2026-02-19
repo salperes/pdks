@@ -195,8 +195,8 @@ export const DevicesPage = () => {
       ipAddress: form.ipAddress.trim(),
       port: form.port,
       direction: form.direction,
+      locationId: form.locationId || null,
     };
-    if (form.locationId) payload.locationId = form.locationId;
     if (form.serialNumber.trim()) payload.serialNumber = form.serialNumber.trim();
     if (form.commKey.trim()) payload.commKey = form.commKey.trim();
 

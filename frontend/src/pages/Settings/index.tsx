@@ -22,6 +22,11 @@ import {
   HardDrive,
   ToggleLeft,
   ToggleRight,
+  Mail,
+  Send,
+  Bell,
+  AlertTriangle,
+  Zap,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { APP_VERSION } from '../../version';
@@ -72,6 +77,35 @@ interface Toast {
   id: number;
   message: string;
   type: 'success' | 'error';
+}
+
+interface EmailSettings {
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecurity: string;
+  smtpUsername: string;
+  smtpPassword: string;
+  smtpFromAddress: string;
+  smtpFromName: string;
+  emailEnabled: boolean;
+  notifyAbsenceEnabled: boolean;
+  notifyAbsenceRecipients: string;
+  notifyAbsenceTime: string;
+  notifyHrEnabled: boolean;
+  notifyHrRecipients: string;
+  notifyHrTime: string;
+  notifySystemErrorEnabled: boolean;
+  notifySystemErrorRecipients: string;
+}
+
+interface EmailLogEntry {
+  id: string;
+  type: string;
+  recipients: string;
+  subject: string;
+  status: string;
+  errorMessage: string | null;
+  createdAt: string;
 }
 
 /* ────────────────── helpers ────────────────── */
@@ -136,6 +170,33 @@ export const SettingsPage = () => {
   const [backupHistoryLoading, setBackupHistoryLoading] = useState(true);
   const [dbBackupLoading, setDbBackupLoading] = useState(false);
 
+  // Email settings state
+  const [emailSettings, setEmailSettings] = useState<EmailSettings>({
+    smtpHost: '',
+    smtpPort: 587,
+    smtpSecurity: 'TLS',
+    smtpUsername: '',
+    smtpPassword: '',
+    smtpFromAddress: '',
+    smtpFromName: '',
+    emailEnabled: false,
+    notifyAbsenceEnabled: false,
+    notifyAbsenceRecipients: '',
+    notifyAbsenceTime: '18:00',
+    notifyHrEnabled: false,
+    notifyHrRecipients: '',
+    notifyHrTime: '18:30',
+    notifySystemErrorEnabled: false,
+    notifySystemErrorRecipients: '',
+  });
+  const [emailSettingsLoading, setEmailSettingsLoading] = useState(true);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [testConnLoading, setTestConnLoading] = useState(false);
+  const [sendTestLoading, setSendTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [emailLogs, setEmailLogs] = useState<EmailLogEntry[]>([]);
+  const [emailLogsLoading, setEmailLogsLoading] = useState(true);
+
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastCounter = useRef(0);
 
@@ -197,12 +258,55 @@ export const SettingsPage = () => {
     setBackupHistoryLoading(false);
   }, []);
 
+  const fetchEmailSettings = useCallback(async () => {
+    try {
+      const res = await api.get('/settings');
+      const d = res.data;
+      setEmailSettings({
+        smtpHost: d.smtpHost ?? '',
+        smtpPort: d.smtpPort ?? 587,
+        smtpSecurity: d.smtpSecurity ?? 'TLS',
+        smtpUsername: d.smtpUsername ?? '',
+        smtpPassword: d.smtpPassword ?? '',
+        smtpFromAddress: d.smtpFromAddress ?? '',
+        smtpFromName: d.smtpFromName ?? '',
+        emailEnabled: d.emailEnabled ?? false,
+        notifyAbsenceEnabled: d.notifyAbsenceEnabled ?? false,
+        notifyAbsenceRecipients: Array.isArray(d.notifyAbsenceRecipients)
+          ? d.notifyAbsenceRecipients.join(', ')
+          : d.notifyAbsenceRecipients ?? '',
+        notifyAbsenceTime: d.notifyAbsenceTime ?? '18:00',
+        notifyHrEnabled: d.notifyHrEnabled ?? false,
+        notifyHrRecipients: Array.isArray(d.notifyHrRecipients)
+          ? d.notifyHrRecipients.join(', ')
+          : d.notifyHrRecipients ?? '',
+        notifyHrTime: d.notifyHrTime ?? '18:30',
+        notifySystemErrorEnabled: d.notifySystemErrorEnabled ?? false,
+        notifySystemErrorRecipients: Array.isArray(d.notifySystemErrorRecipients)
+          ? d.notifySystemErrorRecipients.join(', ')
+          : d.notifySystemErrorRecipients ?? '',
+      });
+    } catch { /* ignore */ }
+    setEmailSettingsLoading(false);
+  }, []);
+
+  const fetchEmailLogs = useCallback(async () => {
+    setEmailLogsLoading(true);
+    try {
+      const res = await api.get('/email/logs?page=1&limit=20');
+      setEmailLogs(res.data.data ?? res.data.items ?? res.data);
+    } catch { /* ignore */ }
+    setEmailLogsLoading(false);
+  }, []);
+
   useEffect(() => {
     fetchSettings();
     fetchHolidays();
     fetchSysInfo();
     fetchBackupHistory();
-  }, [fetchSettings, fetchHolidays, fetchSysInfo, fetchBackupHistory]);
+    fetchEmailSettings();
+    fetchEmailLogs();
+  }, [fetchSettings, fetchHolidays, fetchSysInfo, fetchBackupHistory, fetchEmailSettings, fetchEmailLogs]);
 
   useEffect(() => {
     fetchAuditLogs(auditPage);
@@ -274,6 +378,80 @@ export const SettingsPage = () => {
       addToast('Veritabanı yedekleme başlatılamadı.', 'error');
     }
     setDbBackupLoading(false);
+  };
+
+  const parseRecipients = (val: string): string[] =>
+    val.split(',').map((s) => s.trim()).filter(Boolean);
+
+  const handleSaveEmailSettings = async () => {
+    setEmailSaving(true);
+    try {
+      await api.patch('/settings', {
+        smtpHost: emailSettings.smtpHost || null,
+        smtpPort: emailSettings.smtpPort,
+        smtpSecurity: emailSettings.smtpSecurity,
+        smtpUsername: emailSettings.smtpUsername || null,
+        smtpPassword: emailSettings.smtpPassword,
+        smtpFromAddress: emailSettings.smtpFromAddress || null,
+        smtpFromName: emailSettings.smtpFromName || null,
+        emailEnabled: emailSettings.emailEnabled,
+        notifyAbsenceEnabled: emailSettings.notifyAbsenceEnabled,
+        notifyAbsenceRecipients: parseRecipients(emailSettings.notifyAbsenceRecipients),
+        notifyAbsenceTime: emailSettings.notifyAbsenceTime,
+        notifyHrEnabled: emailSettings.notifyHrEnabled,
+        notifyHrRecipients: parseRecipients(emailSettings.notifyHrRecipients),
+        notifyHrTime: emailSettings.notifyHrTime,
+        notifySystemErrorEnabled: emailSettings.notifySystemErrorEnabled,
+        notifySystemErrorRecipients: parseRecipients(emailSettings.notifySystemErrorRecipients),
+      });
+      addToast('E-posta ayarları kaydedildi.', 'success');
+      setTestResult(null);
+    } catch {
+      addToast('E-posta ayarları kaydedilemedi.', 'error');
+    }
+    setEmailSaving(false);
+  };
+
+  const handleTestConnection = async () => {
+    setTestConnLoading(true);
+    setTestResult(null);
+    try {
+      const res = await api.post('/email/test-connection');
+      setTestResult({ ok: true, message: res.data.message ?? 'Bağlantı başarılı' });
+    } catch (err: any) {
+      setTestResult({
+        ok: false,
+        message: err?.response?.data?.message ?? err?.message ?? 'Bağlantı başarısız',
+      });
+    }
+    setTestConnLoading(false);
+  };
+
+  const handleSendTestEmail = async () => {
+    setSendTestLoading(true);
+    try {
+      await api.post('/email/send-test', { email: emailSettings.smtpFromAddress || emailSettings.smtpUsername });
+      addToast('Test e-postası gönderildi.', 'success');
+      fetchEmailLogs();
+    } catch (err: any) {
+      addToast(err?.response?.data?.message ?? 'Test e-postası gönderilemedi.', 'error');
+    }
+    setSendTestLoading(false);
+  };
+
+  const emailTypeBadge = (type: string) => {
+    switch (type) {
+      case 'absence_warning':
+        return { label: 'Devamsızlık', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' };
+      case 'hr_daily_report':
+        return { label: 'İK Raporu', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' };
+      case 'system_error':
+        return { label: 'Sistem Hatası', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' };
+      case 'test':
+        return { label: 'Test', cls: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' };
+      default:
+        return { label: type, cls: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' };
+    }
   };
 
   const handleExportAuditCsv = async () => {
@@ -458,6 +636,498 @@ export const SettingsPage = () => {
           </button>
         </div>
       )}
+
+      {/* ====== Email Settings ====== */}
+      <div className={cardClass}>
+        <div className="flex items-center gap-2 mb-4">
+          <Mail className="w-5 h-5 text-[#0078d4]" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            E-posta Ayarları
+          </h2>
+        </div>
+
+        {emailSettingsLoading ? (
+          <div className="flex items-center gap-2 py-8">
+            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+            <span className="text-sm text-gray-500">Yükleniyor...</span>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Master toggle */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+              <div>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  E-posta Bildirimlerini Etkinleştir
+                </span>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Tüm e-posta gönderimlerini açar/kapatır
+                </p>
+              </div>
+              <button
+                onClick={() =>
+                  setEmailSettings((prev) => ({ ...prev, emailEnabled: !prev.emailEnabled }))
+                }
+                className="text-[#0078d4] hover:opacity-80 transition-opacity"
+              >
+                {emailSettings.emailEnabled ? (
+                  <ToggleRight className="w-8 h-8" />
+                ) : (
+                  <ToggleLeft className="w-8 h-8 text-gray-400" />
+                )}
+              </button>
+            </div>
+
+            {/* SMTP Configuration */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                SMTP Yapılandırması
+              </h3>
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                      SMTP Sunucu
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="smtp.example.com"
+                      value={emailSettings.smtpHost}
+                      onChange={(e) =>
+                        setEmailSettings((prev) => ({ ...prev, smtpHost: e.target.value }))
+                      }
+                      className={`${inputClass} w-full`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                      Port
+                    </label>
+                    <select
+                      value={emailSettings.smtpPort}
+                      onChange={(e) =>
+                        setEmailSettings((prev) => ({
+                          ...prev,
+                          smtpPort: Number(e.target.value),
+                        }))
+                      }
+                      className={`${inputClass} w-full`}
+                    >
+                      <option value={25}>25</option>
+                      <option value={465}>465</option>
+                      <option value={587}>587</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                    Güvenlik
+                  </label>
+                  <select
+                    value={emailSettings.smtpSecurity}
+                    onChange={(e) =>
+                      setEmailSettings((prev) => ({ ...prev, smtpSecurity: e.target.value }))
+                    }
+                    className={`${inputClass} w-full sm:w-48`}
+                  >
+                    <option value="none">Yok</option>
+                    <option value="TLS">TLS</option>
+                    <option value="SSL">SSL</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                      Kullanıcı Adı
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="user@example.com"
+                      value={emailSettings.smtpUsername}
+                      onChange={(e) =>
+                        setEmailSettings((prev) => ({ ...prev, smtpUsername: e.target.value }))
+                      }
+                      className={`${inputClass} w-full`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                      Şifre
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      value={emailSettings.smtpPassword}
+                      onChange={(e) =>
+                        setEmailSettings((prev) => ({ ...prev, smtpPassword: e.target.value }))
+                      }
+                      className={`${inputClass} w-full`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                      Gönderen Adresi
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="noreply@example.com"
+                      value={emailSettings.smtpFromAddress}
+                      onChange={(e) =>
+                        setEmailSettings((prev) => ({ ...prev, smtpFromAddress: e.target.value }))
+                      }
+                      className={`${inputClass} w-full`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                      Gönderen Adı
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="PDKS Sistem"
+                      value={emailSettings.smtpFromName}
+                      onChange={(e) =>
+                        setEmailSettings((prev) => ({ ...prev, smtpFromName: e.target.value }))
+                      }
+                      className={`${inputClass} w-full`}
+                    />
+                  </div>
+                </div>
+
+                {/* Test Buttons */}
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <button
+                    onClick={handleTestConnection}
+                    disabled={testConnLoading || !emailSettings.smtpHost}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-[#0078d4] text-[#0078d4] hover:bg-[#0078d4]/10 transition-colors disabled:opacity-50"
+                  >
+                    {testConnLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Zap className="w-4 h-4" />
+                    )}
+                    Bağlantı Testi
+                  </button>
+                  <button
+                    onClick={handleSendTestEmail}
+                    disabled={sendTestLoading || !emailSettings.smtpHost}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-[#0078d4] text-[#0078d4] hover:bg-[#0078d4]/10 transition-colors disabled:opacity-50"
+                  >
+                    {sendTestLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    Test E-postası Gönder
+                  </button>
+                </div>
+
+                {/* Test Result */}
+                {testResult && (
+                  <div
+                    className={`flex items-center gap-2 p-3 rounded-lg text-sm ${
+                      testResult.ok
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
+                        : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                    }`}
+                  >
+                    {testResult.ok ? (
+                      <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    )}
+                    {testResult.message}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Divider */}
+            <hr className="border-gray-200 dark:border-gray-700" />
+
+            {/* Notification Types */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                Bildirim Türleri
+              </h3>
+              <div className="space-y-4">
+                {/* Absence Warning */}
+                <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-amber-500" />
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        Devamsızlık Uyarısı
+                      </span>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setEmailSettings((prev) => ({
+                          ...prev,
+                          notifyAbsenceEnabled: !prev.notifyAbsenceEnabled,
+                        }))
+                      }
+                      className="text-[#0078d4] hover:opacity-80 transition-opacity"
+                    >
+                      {emailSettings.notifyAbsenceEnabled ? (
+                        <ToggleRight className="w-7 h-7" />
+                      ) : (
+                        <ToggleLeft className="w-7 h-7 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Gün sonunda kart basmayan personele devamsızlık uyarısı gönderir
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Gönderim Saati
+                      </label>
+                      <input
+                        type="time"
+                        value={emailSettings.notifyAbsenceTime}
+                        onChange={(e) =>
+                          setEmailSettings((prev) => ({
+                            ...prev,
+                            notifyAbsenceTime: e.target.value,
+                          }))
+                        }
+                        className={`${inputClass} w-full`}
+                      />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Alıcılar (virgülle ayırın)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="hr@example.com, manager@example.com"
+                        value={emailSettings.notifyAbsenceRecipients}
+                        onChange={(e) =>
+                          setEmailSettings((prev) => ({
+                            ...prev,
+                            notifyAbsenceRecipients: e.target.value,
+                          }))
+                        }
+                        className={`${inputClass} w-full`}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* HR Daily Report */}
+                <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ClipboardList className="w-4 h-4 text-blue-500" />
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        İK Günlük Rapor
+                      </span>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setEmailSettings((prev) => ({
+                          ...prev,
+                          notifyHrEnabled: !prev.notifyHrEnabled,
+                        }))
+                      }
+                      className="text-[#0078d4] hover:opacity-80 transition-opacity"
+                    >
+                      {emailSettings.notifyHrEnabled ? (
+                        <ToggleRight className="w-7 h-7" />
+                      ) : (
+                        <ToggleLeft className="w-7 h-7 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Gün sonunda İK'ya devamsızlık özet raporu gönderir
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Gönderim Saati
+                      </label>
+                      <input
+                        type="time"
+                        value={emailSettings.notifyHrTime}
+                        onChange={(e) =>
+                          setEmailSettings((prev) => ({
+                            ...prev,
+                            notifyHrTime: e.target.value,
+                          }))
+                        }
+                        className={`${inputClass} w-full`}
+                      />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Alıcılar (virgülle ayırın)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="hr@example.com"
+                        value={emailSettings.notifyHrRecipients}
+                        onChange={(e) =>
+                          setEmailSettings((prev) => ({
+                            ...prev,
+                            notifyHrRecipients: e.target.value,
+                          }))
+                        }
+                        className={`${inputClass} w-full`}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* System Error Notification */}
+                <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-red-500" />
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        Sistem Hatası Bildirimi
+                      </span>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setEmailSettings((prev) => ({
+                          ...prev,
+                          notifySystemErrorEnabled: !prev.notifySystemErrorEnabled,
+                        }))
+                      }
+                      className="text-[#0078d4] hover:opacity-80 transition-opacity"
+                    >
+                      {emailSettings.notifySystemErrorEnabled ? (
+                        <ToggleRight className="w-7 h-7" />
+                      ) : (
+                        <ToggleLeft className="w-7 h-7 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Cihaz bağlantı kopması veya senkronizasyon hatası olduğunda anlık bildirim gönderir
+                  </p>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Alıcılar (virgülle ayırın)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="admin@example.com, it@example.com"
+                      value={emailSettings.notifySystemErrorRecipients}
+                      onChange={(e) =>
+                        setEmailSettings((prev) => ({
+                          ...prev,
+                          notifySystemErrorRecipients: e.target.value,
+                        }))
+                      }
+                      className={`${inputClass} w-full`}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Save Email Settings Button */}
+            <div className="flex justify-end">
+              <button
+                onClick={handleSaveEmailSettings}
+                disabled={emailSaving}
+                className={btnPrimary}
+              >
+                {emailSaving ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Mail className="w-4 h-4" />
+                )}
+                E-posta Ayarlarını Kaydet
+              </button>
+            </div>
+
+            {/* Divider */}
+            <hr className="border-gray-200 dark:border-gray-700" />
+
+            {/* Email Send History */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                E-posta Gönderim Geçmişi
+              </h3>
+              {emailLogsLoading ? (
+                <div className="flex items-center gap-2 py-4">
+                  <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                  <span className="text-sm text-gray-500">Yükleniyor...</span>
+                </div>
+              ) : emailLogs.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-6">
+                  <Mail className="w-8 h-8 text-gray-300 dark:text-gray-600" />
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    Henüz e-posta gönderimi yapılmadı
+                  </span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <th className={thClass}>Tarih</th>
+                        <th className={thClass}>Tür</th>
+                        <th className={thClass}>Alıcı</th>
+                        <th className={thClass}>Konu</th>
+                        <th className={thClass}>Durum</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                      {emailLogs.map((log) => {
+                        const badge = emailTypeBadge(log.type);
+                        return (
+                          <tr
+                            key={log.id}
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                          >
+                            <td className={`${tdClass} whitespace-nowrap`}>
+                              {formatDateTime(log.createdAt)}
+                            </td>
+                            <td className={tdClass}>
+                              <span
+                                className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${badge.cls}`}
+                              >
+                                {badge.label}
+                              </span>
+                            </td>
+                            <td className={`${tdClass} max-w-[200px] truncate`}>
+                              {log.recipients}
+                            </td>
+                            <td className={`${tdClass} max-w-[200px] truncate`}>
+                              {log.subject}
+                            </td>
+                            <td className={tdClass}>
+                              <span
+                                className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${
+                                  log.status === 'sent'
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                }`}
+                              >
+                                {log.status === 'sent' ? 'Gönderildi' : 'Başarısız'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ====== Holidays ====== */}
       <div className={cardClass}>
