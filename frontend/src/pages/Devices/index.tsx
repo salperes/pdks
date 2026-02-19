@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Cpu, Plus, Edit, Trash2, X, Wifi, WifiOff, RefreshCw, MapPin } from 'lucide-react';
+import { Cpu, Plus, Edit, Trash2, X, Wifi, WifiOff, RefreshCw, MapPin, Users, Info, Search } from 'lucide-react';
 import { api } from '../../services/api';
+import { formatDateTime } from '../../utils/date';
 import type { Device, Location } from '../../types';
 
 // ---------------------------------------------------------------------------
@@ -34,9 +35,9 @@ const EMPTY_FORM: DeviceFormData = {
 };
 
 const DIRECTION_LABELS: Record<Device['direction'], string> = {
-  in: 'Giris',
-  out: 'Cikis',
-  both: 'Giris/Cikis',
+  in: 'Giriş',
+  out: 'Çıkış',
+  both: 'Giriş/Çıkış',
 };
 
 // ---------------------------------------------------------------------------
@@ -84,6 +85,20 @@ export const DevicesPage = () => {
   // Connection test state – track per-device
   const [testingIds, setTestingIds] = useState<Set<string>>(new Set());
 
+  // Operation loading states – per-device
+  const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
+  const [enrollingIds, setEnrollingIds] = useState<Set<string>>(new Set());
+  const [pullingIds, setPullingIds] = useState<Set<string>>(new Set());
+  const [syncAllLoading, setSyncAllLoading] = useState(false);
+
+  // Pull data modal
+  const [pullData, setPullData] = useState<any>(null);
+
+  // Device users modal
+  const [deviceUsersData, setDeviceUsersData] = useState<any>(null);
+  const [fetchingUsersIds, setFetchingUsersIds] = useState<Set<string>>(new Set());
+  const [usersSearch, setUsersSearch] = useState('');
+
   // Toast notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [toastSeq, setToastSeq] = useState(0);
@@ -117,7 +132,7 @@ export const DevicesPage = () => {
       const res = await api.get('/devices');
       setDevices(Array.isArray(res.data) ? res.data : res.data.data ?? []);
     } catch {
-      addToast('Cihazlar yuklenirken hata olustu.', 'error');
+      addToast('Cihazlar yüklenirken hata oluştu.', 'error');
     }
   }, [addToast]);
 
@@ -171,7 +186,7 @@ export const DevicesPage = () => {
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.ipAddress.trim()) {
-      addToast('Cihaz adi ve IP adresi zorunludur.', 'error');
+      addToast('Cihaz adı ve IP adresi zorunludur.', 'error');
       return;
     }
 
@@ -189,15 +204,15 @@ export const DevicesPage = () => {
     try {
       if (editingDevice) {
         await api.patch(`/devices/${editingDevice.id}`, payload);
-        addToast('Cihaz basariyla guncellendi.', 'success');
+        addToast('Cihaz başarıyla güncellendi.', 'success');
       } else {
         await api.post('/devices', payload);
-        addToast('Cihaz basariyla eklendi.', 'success');
+        addToast('Cihaz başarıyla eklendi.', 'success');
       }
       closeModal();
       await fetchDevices();
     } catch {
-      addToast('Islem sirasinda hata olustu.', 'error');
+      addToast('İşlem sırasında hata oluştu.', 'error');
     } finally {
       setSaving(false);
     }
@@ -208,11 +223,11 @@ export const DevicesPage = () => {
     setDeleting(true);
     try {
       await api.delete(`/devices/${deleteTarget.id}`);
-      addToast('Cihaz basariyla silindi.', 'success');
+      addToast('Cihaz başarıyla silindi.', 'success');
       setDeleteTarget(null);
       await fetchDevices();
     } catch {
-      addToast('Silme islemi sirasinda hata olustu.', 'error');
+      addToast('Silme işlemi sırasında hata oluştu.', 'error');
     } finally {
       setDeleting(false);
     }
@@ -222,13 +237,13 @@ export const DevicesPage = () => {
     setTestingIds((prev) => new Set(prev).add(device.id));
     try {
       await api.post(`/devices/${device.id}/test`);
-      addToast(`${device.name}: Baglanti basarili.`, 'success');
+      addToast(`${device.name}: Bağlantı başarılı.`, 'success');
     } catch (err: any) {
       const status = err?.response?.status;
       if (status === 501) {
-        addToast(`${device.name}: Baglanti testi henuz desteklenmiyor.`, 'error');
+        addToast(`${device.name}: Bağlantı testi henüz desteklenmiyor.`, 'error');
       } else {
-        addToast(`${device.name}: Baglanti basarisiz.`, 'error');
+        addToast(`${device.name}: Bağlantı başarısız.`, 'error');
       }
     } finally {
       setTestingIds((prev) => {
@@ -236,6 +251,99 @@ export const DevicesPage = () => {
         next.delete(device.id);
         return next;
       });
+    }
+  };
+
+  // ----------------------------------
+  // Device operation handlers
+  // ----------------------------------
+
+  const handleSync = async (device: Device) => {
+    setSyncingIds((prev) => new Set(prev).add(device.id));
+    try {
+      const res = await api.post(`/devices/${device.id}/sync`);
+      const count = res.data?.recordsSynced ?? 0;
+      addToast(`${device.name}: ${count} kayıt senkronize edildi.`, 'success');
+      await fetchDevices();
+    } catch {
+      addToast(`${device.name}: Senkronizasyon başarısız.`, 'error');
+    } finally {
+      setSyncingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(device.id);
+        return next;
+      });
+    }
+  };
+
+  const handleEnrollAll = async (device: Device) => {
+    setEnrollingIds((prev) => new Set(prev).add(device.id));
+    try {
+      const res = await api.post(`/devices/${device.id}/enroll-all`);
+      const msg = res.data?.message ?? 'Toplu tanımlama tamamlandı';
+      addToast(`${device.name}: ${msg}`, 'success');
+    } catch {
+      addToast(`${device.name}: Toplu tanımlama başarısız.`, 'error');
+    } finally {
+      setEnrollingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(device.id);
+        return next;
+      });
+    }
+  };
+
+  const handlePullInfo = async (device: Device) => {
+    setPullingIds((prev) => new Set(prev).add(device.id));
+    try {
+      const res = await api.post(`/devices/${device.id}/pull`);
+      if (res.data?.success) {
+        setPullData(res.data);
+      } else {
+        addToast(`${device.name}: ${res.data?.message ?? 'Veri çekimi başarısız.'}`, 'error');
+      }
+    } catch {
+      addToast(`${device.name}: Cihaz bilgisi alınamadı.`, 'error');
+    } finally {
+      setPullingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(device.id);
+        return next;
+      });
+    }
+  };
+
+  const handleFetchUsers = async (device: Device) => {
+    setFetchingUsersIds((prev) => new Set(prev).add(device.id));
+    try {
+      const res = await api.post(`/devices/${device.id}/users`);
+      if (res.data?.success) {
+        setDeviceUsersData(res.data);
+        setUsersSearch('');
+      } else {
+        addToast(`${device.name}: ${res.data?.message ?? 'Kullanıcı listesi alınamadı.'}`, 'error');
+      }
+    } catch {
+      addToast(`${device.name}: Kullanıcı listesi alınamadı.`, 'error');
+    } finally {
+      setFetchingUsersIds((prev) => {
+        const next = new Set(prev);
+        next.delete(device.id);
+        return next;
+      });
+    }
+  };
+
+  const handleSyncAll = async () => {
+    setSyncAllLoading(true);
+    try {
+      await api.post('/devices/sync-all');
+      addToast('Tüm cihazlar senkronize edildi.', 'success');
+      await fetchDevices();
+    } catch {
+      addToast('Toplu senkronizasyon başarısız.', 'error');
+    } finally {
+      setSyncAllLoading(false);
     }
   };
 
@@ -260,9 +368,9 @@ export const DevicesPage = () => {
     locations.find((l) => l.id === device.locationId)?.name ??
     '-';
 
-  const formatDate = (iso?: string) => {
+  const formatDateTimeNullable = (iso?: string) => {
     if (!iso) return '-';
-    return new Date(iso).toLocaleString('tr-TR');
+    return formatDateTime(iso);
   };
 
   // ----------------------------------
@@ -281,31 +389,41 @@ export const DevicesPage = () => {
             <Cpu className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Cihaz Yonetimi</h1>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Cihaz Yönetimi</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Sistemdeki cihazlari yonetin
+              Sistemdeki cihazları yönetin
             </p>
           </div>
         </div>
-        <button
-          onClick={openAddModal}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0078d4] hover:bg-[#106eba] text-white text-sm font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Yeni Cihaz
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSyncAll}
+            disabled={syncAllLoading}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncAllLoading ? 'animate-spin' : ''}`} />
+            Tümünü Senkronize Et
+          </button>
+          <button
+            onClick={openAddModal}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0078d4] hover:bg-[#106eba] text-white text-sm font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Yeni Cihaz
+          </button>
+        </div>
       </div>
 
       {/* Device grid */}
       {loading ? (
         <div className="flex items-center justify-center py-24">
           <RefreshCw className="w-6 h-6 text-gray-400 animate-spin" />
-          <span className="ml-3 text-gray-500 dark:text-gray-400 text-sm">Yukleniyor...</span>
+          <span className="ml-3 text-gray-500 dark:text-gray-400 text-sm">Yükleniyor...</span>
         </div>
       ) : devices.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-12 text-center">
           <Cpu className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-500 dark:text-gray-400">Henuz cihaz eklenmemis.</p>
+          <p className="text-gray-500 dark:text-gray-400">Henüz cihaz eklenmemiş.</p>
           <button
             onClick={openAddModal}
             className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0078d4] hover:bg-[#106eba] text-white text-sm font-medium transition-colors"
@@ -343,7 +461,7 @@ export const DevicesPage = () => {
                         device.isOnline ? 'bg-emerald-500' : 'bg-red-500'
                       }`}
                     />
-                    {device.isOnline ? 'Cevrimici' : 'Cevrimdisi'}
+                    {device.isOnline ? 'Çevrimiçi' : 'Çevrimdışı'}
                   </span>
                 </div>
 
@@ -368,7 +486,7 @@ export const DevicesPage = () => {
                   <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                     <RefreshCw className="w-4 h-4 shrink-0" />
                     <span>
-                      Yon: <span className="font-medium text-gray-900 dark:text-white">{DIRECTION_LABELS[device.direction]}</span>
+                      Yön: <span className="font-medium text-gray-900 dark:text-white">{DIRECTION_LABELS[device.direction]}</span>
                     </span>
                   </div>
 
@@ -380,20 +498,56 @@ export const DevicesPage = () => {
                   )}
 
                   <div className="text-xs text-gray-400 dark:text-gray-500 pt-1">
-                    Son Senkronizasyon: {formatDate(device.lastSyncAt)}
+                    Son Senkronizasyon: {formatDateTimeNullable(device.lastSyncAt)}
                   </div>
                 </div>
               </div>
 
-              {/* Card actions */}
-              <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-3 flex items-center gap-2 bg-gray-50 dark:bg-gray-900/40">
+              {/* Card actions – operations row */}
+              <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-2.5 flex items-center gap-2 bg-gray-50 dark:bg-gray-900/40">
+                <button
+                  onClick={() => handleSync(device)}
+                  disabled={syncingIds.has(device.id)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncingIds.has(device.id) ? 'animate-spin' : ''}`} />
+                  Senkronize Et
+                </button>
+                <button
+                  onClick={() => handleEnrollAll(device)}
+                  disabled={enrollingIds.has(device.id)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                >
+                  <Users className={`w-3.5 h-3.5 ${enrollingIds.has(device.id) ? 'animate-pulse' : ''}`} />
+                  Toplu Tanımla
+                </button>
+                <button
+                  onClick={() => handleFetchUsers(device)}
+                  disabled={fetchingUsersIds.has(device.id)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                >
+                  <Users className={`w-3.5 h-3.5 ${fetchingUsersIds.has(device.id) ? 'animate-pulse' : ''}`} />
+                  Kullanıcılar
+                </button>
+                <button
+                  onClick={() => handlePullInfo(device)}
+                  disabled={pullingIds.has(device.id)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                >
+                  <Info className={`w-3.5 h-3.5 ${pullingIds.has(device.id) ? 'animate-pulse' : ''}`} />
+                  Cihaz Bilgisi
+                </button>
+              </div>
+
+              {/* Card actions – management row */}
+              <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-2.5 flex items-center gap-2 bg-gray-50 dark:bg-gray-900/40">
                 <button
                   onClick={() => handleTestConnection(device)}
                   disabled={testingIds.has(device.id)}
                   className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
                 >
                   <Wifi className={`w-3.5 h-3.5 ${testingIds.has(device.id) ? 'animate-pulse' : ''}`} />
-                  Baglanti Test
+                  Bağlantı Test
                 </button>
                 <div className="flex-1" />
                 <button
@@ -401,7 +555,7 @@ export const DevicesPage = () => {
                   className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg text-[#0078d4] hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                 >
                   <Edit className="w-3.5 h-3.5" />
-                  Duzenle
+                  Düzenle
                 </button>
                 <button
                   onClick={() => setDeleteTarget(device)}
@@ -427,7 +581,7 @@ export const DevicesPage = () => {
             {/* Modal header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {editingDevice ? 'Cihaz Duzenle' : 'Yeni Cihaz'}
+                {editingDevice ? 'Cihaz Düzenle' : 'Yeni Cihaz'}
               </h2>
               <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                 <X className="w-5 h-5" />
@@ -439,14 +593,14 @@ export const DevicesPage = () => {
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Cihaz Adi <span className="text-red-500">*</span>
+                  Cihaz Adı <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   name="name"
                   value={form.name}
                   onChange={handleChange}
-                  placeholder="Ornek: Ana Giris Terminali"
+                  placeholder="Örnek: Ana Giriş Terminali"
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0078d4] focus:border-transparent outline-none"
                 />
               </div>
@@ -491,7 +645,7 @@ export const DevicesPage = () => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0078d4] focus:border-transparent outline-none"
                 >
-                  <option value="">-- Lokasyon Secin --</option>
+                  <option value="">-- Lokasyon Seçin --</option>
                   {locations.map((loc) => (
                     <option key={loc.id} value={loc.id}>
                       {loc.name}
@@ -503,7 +657,7 @@ export const DevicesPage = () => {
               {/* Direction */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Yon
+                  Yön
                 </label>
                 <select
                   name="direction"
@@ -511,16 +665,16 @@ export const DevicesPage = () => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0078d4] focus:border-transparent outline-none"
                 >
-                  <option value="in">Giris</option>
-                  <option value="out">Cikis</option>
-                  <option value="both">Giris/Cikis</option>
+                  <option value="in">Giriş</option>
+                  <option value="out">Çıkış</option>
+                  <option value="both">Giriş/Çıkış</option>
                 </select>
               </div>
 
               {/* Serial number */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Seri Numarasi
+                  Seri Numarası
                 </label>
                 <input
                   type="text"
@@ -535,14 +689,14 @@ export const DevicesPage = () => {
               {/* Comm Key */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Comm Key (Iletisim Sifresi)
+                  Comm Key (İletişim Şifresi)
                 </label>
                 <input
                   type="text"
                   name="commKey"
                   value={form.commKey}
                   onChange={handleChange}
-                  placeholder="Opsiyonel (ornek: 202212)"
+                  placeholder="Opsiyonel (örnek: 202212)"
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0078d4] focus:border-transparent outline-none"
                 />
               </div>
@@ -554,7 +708,7 @@ export const DevicesPage = () => {
                 onClick={closeModal}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
-                Iptal
+                İptal
               </button>
               <button
                 onClick={handleSave}
@@ -567,6 +721,237 @@ export const DevicesPage = () => {
           </div>
         </div>
       )}
+
+      {/* Pull / Device Info Modal */}
+      {pullData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setPullData(null)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl mx-4 border border-gray-200 dark:border-gray-700 max-h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {pullData.device?.name ?? 'Cihaz'} — Bilgi
+              </h2>
+              <button onClick={() => setPullData(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-5 overflow-y-auto">
+              {/* Device info */}
+              {pullData.info && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Cihaz Bilgisi</h3>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                    {Object.entries(pullData.info).map(([key, value]) => (
+                      <div key={key} className="flex gap-2">
+                        <span className="text-gray-500 dark:text-gray-400 font-medium">{key}:</span>
+                        <span className="text-gray-900 dark:text-white truncate">{String(value ?? '-')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Capacity */}
+              {pullData.counts && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Kapasite</h3>
+                  <div className="flex gap-6 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-[#0078d4]" />
+                      <span className="text-gray-700 dark:text-gray-300">
+                        <span className="font-semibold">{pullData.counts.users}</span> kullanıcı
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 text-[#0078d4]" />
+                      <span className="text-gray-700 dark:text-gray-300">
+                        <span className="font-semibold">{pullData.counts.attendances}</span> kayıt
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Users table */}
+              {pullData.samples?.users?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                    Kullanıcılar (ilk {pullData.samples.users.length})
+                  </h3>
+                  <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 dark:bg-gray-900/40">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">UID</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">Ad</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">Kart No</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">User ID</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {pullData.samples.users.map((u: any, i: number) => (
+                          <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                            <td className="px-3 py-1.5 text-gray-900 dark:text-white font-mono">{u.uid || '-'}</td>
+                            <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300">{u.name || '-'}</td>
+                            <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300 font-mono">{u.cardno || '-'}</td>
+                            <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300 font-mono">{u.userId || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Attendance table */}
+              {pullData.samples?.attendances?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                    Son Kayıtlar (ilk {pullData.samples.attendances.length})
+                  </h3>
+                  <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 dark:bg-gray-900/40">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">UID</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">Tarih/Saat</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {pullData.samples.attendances.map((a: any, i: number) => (
+                          <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                            <td className="px-3 py-1.5 text-gray-900 dark:text-white font-mono">{a.uid ?? a.userId ?? '-'}</td>
+                            <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300 font-mono">
+                              {a.timestamp
+                                ? formatDateTime(a.timestamp)
+                                : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
+              <button
+                onClick={() => setPullData(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Device Users Modal */}
+      {deviceUsersData && (() => {
+        const allUsers: any[] = deviceUsersData.users ?? [];
+        const searchLower = usersSearch.toLowerCase();
+        const filtered = searchLower
+          ? allUsers.filter(
+              (u: any) =>
+                String(u.name ?? '').toLowerCase().includes(searchLower) ||
+                String(u.uid ?? '').toString().includes(searchLower) ||
+                String(u.userId ?? '').toString().includes(searchLower) ||
+                String(u.cardno ?? '').toString().includes(searchLower),
+            )
+          : allUsers;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setDeviceUsersData(null)} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl mx-4 border border-gray-200 dark:border-gray-700 max-h-[85vh] flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {deviceUsersData.device?.name ?? 'Cihaz'} — Tanımlı Kullanıcılar
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                    Toplam {allUsers.length} kullanıcı
+                  </p>
+                </div>
+                <button onClick={() => setDeviceUsersData(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Search */}
+              <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={usersSearch}
+                    onChange={(e) => setUsersSearch(e.target.value)}
+                    placeholder="Kullanıcı ara (ad, UID, kart no)..."
+                    className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0078d4] focus:border-transparent outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Users table */}
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                {filtered.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+                    {allUsers.length === 0 ? 'Cihazda tanımlı kullanıcı bulunamadı.' : 'Aramayla eşleşen kullanıcı yok.'}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 dark:bg-gray-900/40 sticky top-0">
+                        <tr>
+                          <th className="text-left px-3 py-2.5 font-medium text-gray-500 dark:text-gray-400 text-xs">#</th>
+                          <th className="text-left px-3 py-2.5 font-medium text-gray-500 dark:text-gray-400 text-xs">UID</th>
+                          <th className="text-left px-3 py-2.5 font-medium text-gray-500 dark:text-gray-400 text-xs">Ad</th>
+                          <th className="text-left px-3 py-2.5 font-medium text-gray-500 dark:text-gray-400 text-xs">Kart No</th>
+                          <th className="text-left px-3 py-2.5 font-medium text-gray-500 dark:text-gray-400 text-xs">User ID</th>
+                          <th className="text-left px-3 py-2.5 font-medium text-gray-500 dark:text-gray-400 text-xs">Rol</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {filtered.map((u: any, i: number) => (
+                          <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                            <td className="px-3 py-2 text-gray-400 dark:text-gray-500 text-xs">{i + 1}</td>
+                            <td className="px-3 py-2 text-gray-900 dark:text-white font-mono text-xs">{u.uid || '-'}</td>
+                            <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{u.name || '-'}</td>
+                            <td className="px-3 py-2 text-gray-700 dark:text-gray-300 font-mono text-xs">{u.cardno || '-'}</td>
+                            <td className="px-3 py-2 text-gray-700 dark:text-gray-300 font-mono text-xs">{u.userId || '-'}</td>
+                            <td className="px-3 py-2 text-gray-700 dark:text-gray-300 text-xs">
+                              {u.role === 14 ? 'Admin' : u.role === 0 ? 'Normal' : (u.role != null ? u.role : '-')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {searchLower ? `${filtered.length} / ${allUsers.length} gösteriliyor` : `${allUsers.length} kullanıcı`}
+                </span>
+                <button
+                  onClick={() => setDeviceUsersData(null)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Kapat
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Delete confirmation dialog */}
       {deleteTarget && (
@@ -581,11 +966,11 @@ export const DevicesPage = () => {
                 <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Cihazi Sil
+                Cihazı Sil
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 <span className="font-medium text-gray-900 dark:text-white">{deleteTarget.name}</span>{' '}
-                cihazini silmek istediginizden emin misiniz? Bu islem geri alinamaz.
+                cihazını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
               </p>
             </div>
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
@@ -593,7 +978,7 @@ export const DevicesPage = () => {
                 onClick={() => setDeleteTarget(null)}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
-                Iptal
+                İptal
               </button>
               <button
                 onClick={handleDelete}

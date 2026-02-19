@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Interval } from '@nestjs/schedule';
 import { Device, AccessLog, Personnel, SyncHistory } from '../entities';
-import { DeviceManagerService } from './device-manager.service';
 import { ZktecoClientService } from './zkteco-client.service';
 
 @Injectable()
@@ -20,11 +19,10 @@ export class SyncService {
     private readonly personnelRepository: Repository<Personnel>,
     @InjectRepository(SyncHistory)
     private readonly syncHistoryRepository: Repository<SyncHistory>,
-    private readonly deviceManager: DeviceManagerService,
     private readonly zktecoClient: ZktecoClientService,
   ) {}
 
-  @Interval(60_000)
+  @Interval(120_000)
   async syncAllDevices(): Promise<void> {
     if (this.isSyncing) {
       this.logger.debug('Sync already in progress, skipping');
@@ -34,24 +32,30 @@ export class SyncService {
     this.isSyncing = true;
 
     try {
-      const connectedDeviceIds = this.deviceManager.getConnectedDeviceIds();
+      const devices = await this.deviceRepository.find({
+        where: { isActive: true },
+      });
 
-      if (connectedDeviceIds.length === 0) {
+      const reachable = devices.filter(
+        (d) => d.ipAddress && d.ipAddress !== '0.0.0.0',
+      );
+
+      if (reachable.length === 0) {
         return;
       }
 
-      this.logger.debug(`Starting sync for ${connectedDeviceIds.length} device(s)`);
+      this.logger.log(`Starting sync for ${reachable.length} device(s)`);
 
-      for (const deviceId of connectedDeviceIds) {
+      for (const device of reachable) {
         try {
-          const result = await this.syncDevice(deviceId);
+          const result = await this.syncDevice(device);
           if (result.recordsSynced > 0) {
             this.logger.log(
-              `Device ${deviceId}: synced ${result.recordsSynced} record(s)`,
+              `${device.name}: synced ${result.recordsSynced} new record(s)`,
             );
           }
         } catch (error) {
-          this.logger.error(`Failed to sync device ${deviceId}`, error);
+          this.logger.warn(`Failed to sync ${device.name} (${device.ipAddress}): ${error?.message}`);
         }
       }
     } finally {
@@ -59,33 +63,28 @@ export class SyncService {
     }
   }
 
-  async syncDevice(deviceId: string): Promise<{ recordsSynced: number }> {
-    const zk = this.deviceManager.getConnection(deviceId);
-
-    if (!zk) {
-      throw new Error(`Device ${deviceId} is not connected`);
-    }
-
-    const device = await this.deviceRepository.findOne({
-      where: { id: deviceId },
-    });
-
-    if (!device) {
-      throw new Error(`Device ${deviceId} not found in database`);
-    }
-
+  async syncDevice(device: Device): Promise<{ recordsSynced: number }> {
     const syncRecord = this.syncHistoryRepository.create({
-      deviceId,
+      deviceId: device.id,
       syncType: 'attendance',
       status: 'in_progress',
       startedAt: new Date(),
     });
     await this.syncHistoryRepository.save(syncRecord);
 
+    let zk: any = null;
+
     try {
+      // Fresh connection for each sync (avoids stale connection issues)
+      zk = await this.zktecoClient.connect(
+        device.ipAddress,
+        device.port,
+        device.commKey || undefined,
+      );
+
       const attendanceData = await this.zktecoClient.getAttendances(zk);
       const logs: any[] = attendanceData?.data ?? [];
-      this.logger.debug(`Device ${deviceId}: getAttendances returned ${logs.length} record(s)`);
+      this.logger.debug(`${device.name}: getAttendances returned ${logs.length} record(s)`);
       let recordsSynced = 0;
 
       for (const log of logs) {
@@ -95,7 +94,9 @@ export class SyncService {
         }
       }
 
-      await this.deviceRepository.update(deviceId, {
+      await this.deviceRepository.update(device.id, {
+        isOnline: true,
+        lastOnlineAt: new Date(),
         lastSyncAt: new Date(),
       });
 
@@ -112,6 +113,10 @@ export class SyncService {
       await this.syncHistoryRepository.save(syncRecord);
 
       throw error;
+    } finally {
+      if (zk) {
+        await this.zktecoClient.disconnect(zk);
+      }
     }
   }
 
@@ -120,16 +125,24 @@ export class SyncService {
     const rawUserId = log.user_id ?? log.deviceUserId ?? log.uid;
     const deviceUserId = rawUserId != null ? Number(rawUserId) : null;
 
-    // Extract event time (zkteco-js returns Date objects, not strings)
+    // Extract event time (zkteco-js returns Date objects in device-local time)
+    // ZKTeco devices store local time (Turkey = UTC+3), not UTC.
     const rawTime = log.record_time ?? log.recordTime;
-    const eventTime: Date = rawTime instanceof Date
-      ? rawTime
-      : rawTime
-        ? new Date(rawTime)
-        : new Date();
+    let eventTime: Date;
+    if (rawTime instanceof Date) {
+      // Device returns a Date parsed as UTC, but it's actually local time.
+      // Subtract the timezone offset to convert to real UTC.
+      eventTime = new Date(rawTime.getTime() - 3 * 60 * 60 * 1000);
+    } else if (rawTime) {
+      const parsed = new Date(rawTime);
+      eventTime = new Date(parsed.getTime() - 3 * 60 * 60 * 1000);
+    } else {
+      eventTime = new Date();
+    }
 
-    // Skip records with clearly invalid dates (year 0 or before 2000)
-    if (eventTime.getFullYear() < 2000) {
+    // Skip records with clearly invalid dates (before 2000 or far future)
+    const year = eventTime.getFullYear();
+    if (year < 2000 || year > new Date().getFullYear() + 1) {
       return false;
     }
 

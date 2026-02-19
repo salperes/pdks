@@ -35,9 +35,9 @@ const emptyForm: UserForm = {
 };
 
 const roleLabels: Record<string, string> = {
-  admin: 'Yonetici',
-  operator: 'Operator',
-  viewer: 'Izleyici',
+  admin: 'Yönetici',
+  operator: 'Operatör',
+  viewer: 'İzleyici',
 };
 
 const roleColors: Record<string, string> = {
@@ -86,7 +86,7 @@ export const UsersPage = () => {
       const res = await api.get<User[]>('/users');
       setUsers(res.data);
     } catch {
-      showToast('Kullanicilar yuklenirken hata olustu.', 'error');
+      showToast('Kullanıcılar yüklenirken hata oluştu.', 'error');
     } finally {
       setLoading(false);
     }
@@ -126,15 +126,15 @@ export const UsersPage = () => {
 
   const handleSave = async () => {
     if (!form.username.trim() || !form.fullName.trim()) {
-      showToast('Kullanici adi ve Ad Soyad alanlari zorunludur.', 'error');
+      showToast('Kullanıcı adı ve Ad Soyad alanları zorunludur.', 'error');
       return;
     }
     if (!editingId && form.password.length < 6) {
-      showToast('Sifre en az 6 karakter olmalidir.', 'error');
+      showToast('Şifre en az 6 karakter olmalıdır.', 'error');
       return;
     }
     if (editingId && form.password && form.password.length < 6) {
-      showToast('Sifre en az 6 karakter olmalidir.', 'error');
+      showToast('Şifre en az 6 karakter olmalıdır.', 'error');
       return;
     }
 
@@ -150,7 +150,7 @@ export const UsersPage = () => {
         if (form.email.trim()) payload.email = form.email.trim();
         if (form.password) payload.password = form.password;
         await api.patch(`/users/${editingId}`, payload);
-        showToast('Kullanici basariyla guncellendi.', 'success');
+        showToast('Kullanıcı başarıyla güncellendi.', 'success');
       } else {
         const payload: Record<string, string> = {
           username: form.username.trim(),
@@ -160,14 +160,14 @@ export const UsersPage = () => {
         };
         if (form.email.trim()) payload.email = form.email.trim();
         await api.post('/users', payload);
-        showToast('Kullanici basariyla eklendi.', 'success');
+        showToast('Kullanıcı başarıyla eklendi.', 'success');
       }
       closeModal();
       fetchUsers();
     } catch (err: any) {
       const msg =
         err?.response?.data?.message ||
-        (editingId ? 'Kullanici guncellenirken hata olustu.' : 'Kullanici eklenirken hata olustu.');
+        (editingId ? 'Kullanıcı güncellenirken hata oluştu.' : 'Kullanıcı eklenirken hata oluştu.');
       showToast(typeof msg === 'string' ? msg : JSON.stringify(msg), 'error');
     } finally {
       setSaving(false);
@@ -181,11 +181,11 @@ export const UsersPage = () => {
     setDeleting(true);
     try {
       await api.delete(`/users/${deleteTarget.id}`);
-      showToast('Kullanici basariyla silindi.', 'success');
+      showToast('Kullanıcı başarıyla silindi.', 'success');
       setDeleteTarget(null);
       fetchUsers();
     } catch {
-      showToast('Kullanici silinirken hata olustu.', 'error');
+      showToast('Kullanıcı silinirken hata oluştu.', 'error');
     } finally {
       setDeleting(false);
     }
@@ -223,10 +223,10 @@ export const UsersPage = () => {
             </div>
             <div>
               <h1 className="text-xl font-semibold text-gray-900 dark:text-white truncate">
-                Kullanici Yonetimi
+                Kullanıcı Yönetimi
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {users.length} kullanici
+                {users.length} kullanıcı
               </p>
             </div>
           </div>
@@ -237,7 +237,7 @@ export const UsersPage = () => {
               className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#0078d4] hover:bg-[#106eba] text-white text-sm font-medium transition-colors"
             >
               <Plus className="w-4 h-4" />
-              <span>Yeni Kullanici</span>
+              <span>Yeni Kullanıcı</span>
             </button>
           </div>
         </div>
@@ -250,7 +250,7 @@ export const UsersPage = () => {
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                 <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300">
-                  Kullanici
+                  Kullanıcı
                 </th>
                 <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 hidden sm:table-cell">
                   E-posta
@@ -262,7 +262,7 @@ export const UsersPage = () => {
                   Durum
                 </th>
                 <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 text-right">
-                  Islemler
+                  İşlemler
                 </th>
               </tr>
             </thead>
@@ -272,7 +272,7 @@ export const UsersPage = () => {
                   <td colSpan={5} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
                       <div className="w-8 h-8 border-2 border-gray-300 dark:border-gray-600 border-t-[#0078d4] rounded-full animate-spin" />
-                      <span className="text-sm">Yukleniyor...</span>
+                      <span className="text-sm">Yükleniyor...</span>
                     </div>
                   </td>
                 </tr>
@@ -281,7 +281,7 @@ export const UsersPage = () => {
                   <td colSpan={5} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
                       <Shield className="w-10 h-10" />
-                      <span className="text-sm">Henuz kullanici kaydi yok.</span>
+                      <span className="text-sm">Henüz kullanıcı kaydı yok.</span>
                     </div>
                   </td>
                 </tr>
@@ -333,7 +333,7 @@ export const UsersPage = () => {
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => openEditModal(u)}
-                          title="Duzenle"
+                          title="Düzenle"
                           className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400 hover:text-[#0078d4] transition-colors"
                         >
                           <Edit className="w-4 h-4" />
@@ -367,12 +367,12 @@ export const UsersPage = () => {
                 {editingId ? (
                   <>
                     <Edit className="w-5 h-5 text-[#0078d4]" />
-                    Kullanici Duzenle
+                    Kullanıcı Düzenle
                   </>
                 ) : (
                   <>
                     <UserPlus className="w-5 h-5 text-[#0078d4]" />
-                    Yeni Kullanici
+                    Yeni Kullanıcı
                   </>
                 )}
               </h2>
@@ -389,7 +389,7 @@ export const UsersPage = () => {
               {/* Row: username, fullName */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
-                  label="Kullanici Adi"
+                  label="Kullanıcı Adı"
                   required
                   value={form.username}
                   onChange={(v) => updateField('username', v)}
@@ -405,12 +405,12 @@ export const UsersPage = () => {
 
               {/* Password */}
               <FormField
-                label={editingId ? 'Yeni Sifre' : 'Sifre'}
+                label={editingId ? 'Yeni Şifre' : 'Şifre'}
                 required={!editingId}
                 type="password"
                 value={form.password}
                 onChange={(v) => updateField('password', v)}
-                placeholder={editingId ? 'Degistirmek icin doldurun' : 'En az 6 karakter'}
+                placeholder={editingId ? 'Değiştirmek için doldurun' : 'En az 6 karakter'}
               />
 
               {/* Email */}
@@ -431,9 +431,9 @@ export const UsersPage = () => {
                   onChange={(e) => updateField('role', e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0078d4] focus:border-transparent"
                 >
-                  <option value="admin">Yonetici</option>
-                  <option value="operator">Operator</option>
-                  <option value="viewer">Izleyici</option>
+                  <option value="admin">Yönetici</option>
+                  <option value="operator">Operatör</option>
+                  <option value="viewer">İzleyici</option>
                 </select>
               </div>
             </div>
@@ -445,7 +445,7 @@ export const UsersPage = () => {
                 disabled={saving}
                 className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
               >
-                Iptal
+                İptal
               </button>
               <button
                 onClick={handleSave}
@@ -473,13 +473,13 @@ export const UsersPage = () => {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Kullaniciyi Sil
+                  Kullanıcıyı Sil
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   <span className="font-medium text-gray-700 dark:text-gray-200">
                     {deleteTarget.fullName}
                   </span>{' '}
-                  ({deleteTarget.username}) kullanicisini silmek istediginize emin misiniz?
+                  ({deleteTarget.username}) kullanıcısını silmek istediğinize emin misiniz?
                 </p>
               </div>
               <div className="flex items-center gap-3 w-full">
@@ -488,7 +488,7 @@ export const UsersPage = () => {
                   disabled={deleting}
                   className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
                 >
-                  Iptal
+                  İptal
                 </button>
                 <button
                   onClick={handleDelete}

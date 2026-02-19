@@ -26,6 +26,10 @@ export class QueryAccessLogsDto {
   @IsOptional()
   direction?: string;
 
+  @IsString()
+  @IsOptional()
+  search?: string;
+
   @Type(() => Number)
   @IsInt()
   @Min(1)

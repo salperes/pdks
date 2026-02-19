@@ -40,7 +40,7 @@ export const LoginPage = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Kullanici Adi
+                Kullanıcı Adı
               </label>
               <input
                 type="text"
@@ -54,7 +54,7 @@ export const LoginPage = () => {
 
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Sifre
+                Şifre
               </label>
               <input
                 type="password"
@@ -72,7 +72,7 @@ export const LoginPage = () => {
               className="w-full py-2.5 px-4 bg-[#0078d4] hover:bg-[#106ebe] text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isLoading ? 'Giris Yapiliyor...' : 'Giris Yap'}
+              {isLoading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
             </button>
           </form>
         </div>

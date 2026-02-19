@@ -11,4 +11,9 @@ export class DashboardController {
   getSummary() {
     return this.dashboardService.getSummary();
   }
+
+  @Get('hourly-stats')
+  getHourlyStats() {
+    return this.dashboardService.getHourlyStats();
+  }
 }

@@ -21,21 +21,21 @@ export class AccessLog {
   @Column({ type: 'uuid', nullable: true, name: 'personnel_id' })
   personnelId: string;
 
-  @ManyToOne(() => Personnel)
+  @ManyToOne(() => Personnel, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'personnel_id' })
   personnel: Personnel;
 
-  @Column({ type: 'uuid', name: 'device_id' })
+  @Column({ type: 'uuid', nullable: true, name: 'device_id' })
   deviceId: string;
 
-  @ManyToOne(() => Device)
+  @ManyToOne(() => Device, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'device_id' })
   device: Device;
 
   @Column({ type: 'uuid', nullable: true, name: 'location_id' })
   locationId: string;
 
-  @ManyToOne(() => Location)
+  @ManyToOne(() => Location, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'location_id' })
   location: Location;
 

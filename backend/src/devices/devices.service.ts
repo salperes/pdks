@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Device } from '../entities';
+import { Device, AccessLog } from '../entities';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
 
@@ -10,6 +10,8 @@ export class DevicesService {
   constructor(
     @InjectRepository(Device)
     private readonly devicesRepository: Repository<Device>,
+    @InjectRepository(AccessLog)
+    private readonly accessLogRepository: Repository<AccessLog>,
   ) {}
 
   async findAll(): Promise<Device[]> {
@@ -59,6 +61,13 @@ export class DevicesService {
 
   async remove(id: string): Promise<void> {
     const device = await this.findById(id);
+    // Nullify FK references in access_logs before deleting
+    await this.accessLogRepository
+      .createQueryBuilder()
+      .update()
+      .set({ deviceId: null as any })
+      .where('deviceId = :id', { id })
+      .execute();
     await this.devicesRepository.remove(device);
   }
 }

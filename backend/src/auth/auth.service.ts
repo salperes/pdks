@@ -67,6 +67,26 @@ export class AuthService {
     };
   }
 
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.usersService.findById(userId);
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Kullanıcı bulunamadı');
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isValid) {
+      throw new UnauthorizedException('Mevcut şifre hatalı');
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
+    await this.usersService.saveUser(user);
+  }
+
   async hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, this.SALT_ROUNDS);
   }

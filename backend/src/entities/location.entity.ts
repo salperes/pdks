@@ -25,6 +25,18 @@ export class Location {
   @Column({ type: 'boolean', default: true, name: 'is_active' })
   isActive: boolean;
 
+  @Column({ type: 'varchar', length: 5, nullable: true, name: 'work_start_time' })
+  workStartTime: string | null;
+
+  @Column({ type: 'varchar', length: 5, nullable: true, name: 'work_end_time' })
+  workEndTime: string | null;
+
+  @Column({ type: 'boolean', default: false, name: 'is_flexible' })
+  isFlexible: boolean;
+
+  @Column({ type: 'int', nullable: true, name: 'flex_grace_minutes' })
+  flexGraceMinutes: number | null;
+
   @OneToMany(() => Device, (device) => device.location)
   devices: Device[];
 

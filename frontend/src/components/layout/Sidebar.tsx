@@ -6,6 +6,7 @@ import {
   Cpu,
   MapPin,
   BarChart3,
+  ShieldCheck,
   Settings,
   LogOut,
   type LucideIcon,
@@ -21,14 +22,15 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: '/', icon: Home, label: 'Dashboard' },
   { path: '/personnel', icon: Users, label: 'Personel' },
-  { path: '/access-logs', icon: ClipboardList, label: 'Gecis Kayitlari' },
+  { path: '/access-logs', icon: ClipboardList, label: 'Geçiş Kayıtları' },
   { path: '/reports', icon: BarChart3, label: 'Raporlar' },
 ];
 
 const adminItems: NavItem[] = [
   { path: '/devices', icon: Cpu, label: 'Cihazlar' },
+  { path: '/supervisor', icon: ShieldCheck, label: 'Erişim Yönetimi' },
   { path: '/locations', icon: MapPin, label: 'Lokasyonlar' },
-  { path: '/admin/users', icon: Users, label: 'Kullanicilar' },
+  { path: '/admin/users', icon: Users, label: 'Kullanıcılar' },
   { path: '/admin/settings', icon: Settings, label: 'Ayarlar' },
 ];
 
@@ -78,7 +80,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           {user?.role === 'admin' && (
             <div className="mt-6 px-3">
               <p className="px-3 mb-2 text-xs text-gray-400 uppercase tracking-wider">
-                Yonetim
+                Yönetim
               </p>
               <div className="space-y-1">{adminItems.map(renderNavItem)}</div>
             </div>
@@ -91,7 +93,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             className="flex items-center gap-3 px-3 py-2.5 w-full text-gray-300 hover:bg-white/10 rounded-lg transition-colors"
           >
             <LogOut className="w-5 h-5" />
-            <span className="text-sm font-medium">Cikis Yap</span>
+            <span className="text-sm font-medium">Çıkış Yap</span>
           </button>
         </div>
       </aside>

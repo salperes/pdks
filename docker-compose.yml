@@ -3,21 +3,17 @@ services:
     image: postgres:16-alpine
     container_name: pdks-postgres
     restart: unless-stopped
-    ports:
-      - '5433:5432'
     environment:
       POSTGRES_DB: pdks
       POSTGRES_USER: pdks
       POSTGRES_PASSWORD: pdks123
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
 
   backend:
     build: ./backend
-    container_name: pdks-backend
+    container_name: pdks-server
     restart: unless-stopped
-    ports:
-      - '3000:3000'
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -34,12 +30,9 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: pdks-frontend
+    container_name: pdks-client
     restart: unless-stopped
     ports:
       - '5174:80'
     depends_on:
       - backend
-
-volumes:
-  pgdata:

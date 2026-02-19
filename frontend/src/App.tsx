@@ -9,6 +9,9 @@ import { DevicesPage } from './pages/Devices';
 import { LocationsPage } from './pages/Locations';
 import { AccessLogsPage } from './pages/AccessLogs';
 import { UsersPage } from './pages/Admin/Users';
+import { ReportsPage } from './pages/Reports';
+import { SettingsPage } from './pages/Settings';
+import { SupervisorPage } from './pages/Supervisor';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -19,13 +22,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 };
-
-const PlaceholderPage = ({ title }: { title: string }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-    <h1 className="text-xl font-semibold text-gray-900 dark:text-white">{title}</h1>
-    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Bu sayfa yapilandiriliyor...</p>
-  </div>
-);
 
 function App() {
   return (
@@ -44,11 +40,12 @@ function App() {
             <Route index element={<DashboardPage />} />
             <Route path="personnel" element={<PersonnelPage />} />
             <Route path="access-logs" element={<AccessLogsPage />} />
-            <Route path="reports" element={<PlaceholderPage title="Raporlar" />} />
+            <Route path="reports" element={<ReportsPage />} />
             <Route path="devices" element={<DevicesPage />} />
+            <Route path="supervisor" element={<SupervisorPage />} />
             <Route path="locations" element={<LocationsPage />} />
             <Route path="admin/users" element={<UsersPage />} />
-            <Route path="admin/settings" element={<PlaceholderPage title="Ayarlar" />} />
+            <Route path="admin/settings" element={<SettingsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

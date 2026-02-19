@@ -20,6 +20,10 @@ export class CreatePersonnelDto {
 
   @IsString()
   @IsOptional()
+  username?: string;
+
+  @IsString()
+  @IsOptional()
   department?: string;
 
   @IsString()

@@ -10,9 +10,15 @@ import { DevicesModule } from './devices/devices.module';
 import { AccessLogsModule } from './access-logs/access-logs.module';
 import { DeviceCommModule } from './device-comm/device-comm.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ReportsModule } from './reports/reports.module';
+import { SettingsModule } from './settings/settings.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { AdmsModule } from './adms/adms.module';
-import { User, Personnel, Location, Device, AccessLog, SyncHistory } from './entities';
+import { AuditLogModule } from './audit-log/audit-log.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { BackupModule } from './backup/backup.module';
+import { SupervisorModule } from './supervisor/supervisor.module';
+import { User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettings, Holiday, AuditLog, BackupHistory, PersonnelDevice } from './entities';
 
 @Module({
   imports: [
@@ -26,7 +32,7 @@ import { User, Personnel, Location, Device, AccessLog, SyncHistory } from './ent
         username: config.get('DB_USERNAME', 'pdks'),
         password: config.get('DB_PASSWORD', 'pdks123'),
         database: config.get('DB_DATABASE', 'pdks'),
-        entities: [User, Personnel, Location, Device, AccessLog, SyncHistory],
+        entities: [User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettings, Holiday, AuditLog, BackupHistory, PersonnelDevice],
         synchronize: true, // DEV only
       }),
     }),
@@ -38,9 +44,15 @@ import { User, Personnel, Location, Device, AccessLog, SyncHistory } from './ent
     DevicesModule,
     AccessLogsModule,
     DashboardModule,
+    ReportsModule,
+    SettingsModule,
     DeviceCommModule,
     GatewayModule,
     AdmsModule,
+    AuditLogModule,
+    NotificationsModule,
+    BackupModule,
+    SupervisorModule,
   ],
 })
 export class AppModule {}

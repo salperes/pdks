@@ -1,5 +1,7 @@
 # PDKS - Personel Devam Kontrol Sistemi
 
+## Mevcut Versiyon: 1.0.015
+
 ## Proje Ozeti
 ZKTeco SC403 kart okuyucu terminallerle entegre personel devam kontrol sistemi.
 NestJS backend + React frontend + PostgreSQL veritabani.
@@ -49,16 +51,16 @@ TypeORM `synchronize: true` (development). Tablolar otomatik olusur.
 
 ## Varsayilan Admin Kullanici
 - **Username**: admin
-- **Password**: Admin123!
+- **Password**: admin123
 - Auth service ilk calistirmada otomatik olusturur
 
 ## ZKTeco Cihazlar (5 adet SC403, firmware Ver 6.60)
 | Cihaz | IP (guncel) | Seri No | CommPassword | comm_type | Durum |
 |-------|------------|---------|--------------|-----------|-------|
 | Fabrika 1 | 192.168.204.233 | AJ8O223760445 | (yok) | 3 (ADMS) | Erisim disi (ping yok) |
-| Fabrika 2 | 192.168.152.233 | AJ8O223760433 | (yok) | 3 (ADMS) | UDP calisiyor, 8 log |
-| Merkez Ofis | 192.168.104.242 | 6079214600262 | 202212 | 3 (ADMS) | ACK_UNAUTH - CommKey calismıyor |
-| Optik Oda | 192.168.104.241 | 6079214600523 | 202212 | 3 (ADMS) | ACK_UNAUTH - CommKey calismıyor |
+| Fabrika 2 | 192.168.152.233 | AJ8O223760433 | (yok) | 3 (ADMS) | UDP calisiyor (prod'dan erisim var) |
+| Merkez Ofis | 192.168.104.242 | 6079214600262 | 202212 | 3 (ADMS) | UDP calisiyor (prod'dan CommKey auth basarili) |
+| Optik Oda | 192.168.104.241 | 6079214600523 | 202212 | 3 (ADMS) | UDP calisiyor (prod'dan CommKey auth basarili) |
 | 4.Ar-Ge Arka Kapi | 192.168.107.240 | AJ8O203360369 | 202212 | 3 (ADMS) | Erisim disi (ping yok) |
 
 ### Cihaz Iletisim Modlari
@@ -100,12 +102,31 @@ cd backend && npm install && npm run start:dev   # port 3000
 cd frontend && npm install && npm run dev         # port 5173 (Vite proxy aktif)
 ```
 
+## Production Deploy
+- **Sunucu**: 192.168.88.111 (mssadmin / Ankara12!)
+- **URL**: http://192.168.88.111:5174
+- **Dizin**: /home/mssadmin/pdks
+- **Container'lar**: pdks-postgres, pdks-server, pdks-client
+- **Dis port**: Sadece 5174 (frontend nginx)
+- **Backend/DB**: Internal Docker network (dis erisim yok)
+- **DB yedek dizini**: /home/mssadmin/pdks/backup
+- **Ilk deploy**: 19.02.2026 (v1.0.014)
+
+### Sunucudaki Diger Servisler ve Port Haritasi
+| Port | Servis |
+|------|--------|
+| 22 | SSH |
+| 80 | Portal (nginx) |
+| 3010 | Portal-FTS |
+| 5000 | TaskMgmt |
+| 5174 | **PDKS** |
+| 8080 | RMS |
+| 18088 | OnlyOffice |
+
 ## Siradaki Adimlar
-1. `docker-compose up -d --build` ile tum stack'i calistir
-2. ADMS endpoint'ini test et: `curl http://localhost:3000/iclock/cdata?SN=TEST`
-3. Cihazlarda ADMS server adresini `http://<host-ip>:3000` olarak ayarla
-4. Access.mdb'den 54,954 tarihsel kaydi PostgreSQL'e aktar
-5. Tum cihazlardan canli ADMS push'u test et
+1. Cihazlarda ADMS server adresini `http://192.168.88.111:3000` olarak ayarla
+2. Access.mdb'den 54,954 tarihsel kaydi PostgreSQL'e aktar
+3. Tum cihazlardan canli ADMS push'u test et
 
 ## Onemli Teknik Detaylar
 - Backend API prefix: `/api/v1` (main.ts'de setGlobalPrefix)
@@ -121,12 +142,12 @@ cd frontend && npm install && npm run dev         # port 5173 (Vite proxy aktif)
 - ZUDP inport range: 5200-5300 (rotate)
 - `getInfo()` opsiyonel - bazi modeller desteklemiyor, hata durumunda atlanir
 
-## Docker Servisleri
+## Docker Servisleri (Production)
 | Servis | Image | Container | Port (host:container) |
 |--------|-------|-----------|----------------------|
-| postgres | postgres:16-alpine | pdks-postgres | 5433:5432 |
-| backend | ./backend (node:20-alpine) | pdks-backend | 3000:3000 |
-| frontend | ./frontend (nginx:alpine) | pdks-frontend | 5174:80 |
+| postgres | postgres:16-alpine | pdks-postgres | (internal) |
+| backend | ./backend (node:20-alpine) | pdks-server | (internal) |
+| frontend | ./frontend (nginx:alpine) | pdks-client | 5174:80 |
 
 ## Git
 - Repo: https://github.com/salperes/pdks.git (private)

@@ -14,6 +14,7 @@ export interface Personnel {
   firstName: string;
   lastName: string;
   employeeId?: string;
+  username?: string;
   cardNumber: string;
   department?: string;
   title?: string;
@@ -22,6 +23,8 @@ export interface Personnel {
   photoUrl?: string;
   isActive: boolean;
   createdAt: string;
+  lastAccessTime?: string;
+  lastDirection?: 'in' | 'out';
 }
 
 export interface Location {
@@ -31,6 +34,10 @@ export interface Location {
   description?: string;
   isActive: boolean;
   devicesCount?: number;
+  workStartTime?: string | null;
+  workEndTime?: string | null;
+  isFlexible?: boolean;
+  flexGraceMinutes?: number | null;
 }
 
 export interface Device {
@@ -56,6 +63,7 @@ export interface AccessLog {
   device?: Device;
   locationId?: string;
   location?: Location;
+  deviceUserId?: number;
   eventTime: string;
   direction?: 'in' | 'out';
   source: string;

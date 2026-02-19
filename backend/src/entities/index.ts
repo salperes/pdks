@@ -4,3 +4,8 @@ export { Location } from './location.entity';
 export { Device, DeviceDirection } from './device.entity';
 export { AccessLog } from './access-log.entity';
 export { SyncHistory } from './sync-history.entity';
+export { SystemSettings } from './system-settings.entity';
+export { Holiday } from './holiday.entity';
+export { AuditLog } from './audit-log.entity';
+export { BackupHistory } from './backup-history.entity';
+export { PersonnelDevice } from './personnel-device.entity';

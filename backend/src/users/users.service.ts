@@ -88,6 +88,10 @@ export class UsersService implements OnModuleInit {
     return this.usersRepository.save(user);
   }
 
+  async saveUser(user: User): Promise<User> {
+    return this.usersRepository.save(user);
+  }
+
   async remove(id: string): Promise<void> {
     const user = await this.findById(id);
     await this.usersRepository.remove(user);

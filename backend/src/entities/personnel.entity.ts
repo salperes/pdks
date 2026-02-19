@@ -25,6 +25,10 @@ export class Personnel {
   employeeId: string;
 
   @Index()
+  @Column({ type: 'varchar', length: 100, unique: true, nullable: true })
+  username: string;
+
+  @Index()
   @Column({ type: 'varchar', length: 50, unique: true, name: 'card_number' })
   cardNumber: string;
 

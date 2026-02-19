@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { MapPin, Plus, Edit, Trash2, X, Building2, Cpu } from 'lucide-react';
+import { MapPin, Plus, Edit, Trash2, X, Building2, Cpu, Clock, ToggleLeft, ToggleRight } from 'lucide-react';
 import { api } from '../../services/api';
 import type { Location } from '../../types';
 
@@ -7,6 +7,11 @@ interface LocationForm {
   name: string;
   address: string;
   description: string;
+  useCustomSchedule: boolean;
+  workStartTime: string;
+  workEndTime: string;
+  isFlexible: boolean;
+  flexGraceMinutes: number;
 }
 
 interface Toast {
@@ -15,7 +20,16 @@ interface Toast {
   type: 'success' | 'error';
 }
 
-const emptyForm: LocationForm = { name: '', address: '', description: '' };
+const emptyForm: LocationForm = {
+  name: '',
+  address: '',
+  description: '',
+  useCustomSchedule: false,
+  workStartTime: '08:00',
+  workEndTime: '17:00',
+  isFlexible: false,
+  flexGraceMinutes: 60,
+};
 
 export const LocationsPage = () => {
   const [locations, setLocations] = useState<Location[]>([]);
@@ -60,10 +74,16 @@ export const LocationsPage = () => {
 
   const openEditModal = (loc: Location) => {
     setEditingId(loc.id);
+    const hasCustom = !!(loc.workStartTime && loc.workEndTime);
     setForm({
       name: loc.name,
       address: loc.address || '',
       description: loc.description || '',
+      useCustomSchedule: hasCustom,
+      workStartTime: loc.workStartTime || '08:00',
+      workEndTime: loc.workEndTime || '17:00',
+      isFlexible: loc.isFlexible || false,
+      flexGraceMinutes: loc.flexGraceMinutes || 60,
     });
     setModalOpen(true);
   };
@@ -80,9 +100,21 @@ export const LocationsPage = () => {
 
     setSaving(true);
     try {
-      const payload: Record<string, string> = { name: form.name.trim() };
+      const payload: Record<string, any> = { name: form.name.trim() };
       if (form.address.trim()) payload.address = form.address.trim();
       if (form.description.trim()) payload.description = form.description.trim();
+
+      if (form.useCustomSchedule) {
+        payload.workStartTime = form.workStartTime;
+        payload.workEndTime = form.workEndTime;
+        payload.isFlexible = form.isFlexible;
+        payload.flexGraceMinutes = form.isFlexible ? form.flexGraceMinutes : null;
+      } else {
+        payload.workStartTime = null;
+        payload.workEndTime = null;
+        payload.isFlexible = false;
+        payload.flexGraceMinutes = null;
+      }
 
       if (editingId) {
         await api.patch(`/locations/${editingId}`, payload);
@@ -221,6 +253,27 @@ export const LocationsPage = () => {
                 </p>
               )}
 
+              {/* Mesai bilgisi */}
+              <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mb-3">
+                <Clock className="w-3.5 h-3.5" />
+                <span>
+                  {loc.workStartTime && loc.workEndTime ? (
+                    <>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        {loc.workStartTime}–{loc.workEndTime}
+                      </span>
+                      {loc.isFlexible && (
+                        <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">
+                          (Esnek{loc.flexGraceMinutes ? ` ${loc.flexGraceMinutes}dk` : ''})
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-gray-400 dark:text-gray-500">Varsayılan mesai</span>
+                  )}
+                </span>
+              </div>
+
               <div className="mt-auto pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                   <Cpu className="w-3.5 h-3.5" />
@@ -310,6 +363,114 @@ export const LocationsPage = () => {
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0078d4] focus:border-transparent outline-none transition-colors resize-none"
                 />
               </div>
+
+              {/* Mesai Programı */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-[#0078d4]" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Mesai Programı
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, useCustomSchedule: !form.useCustomSchedule })}
+                    className="text-[#0078d4] hover:opacity-80 transition-opacity"
+                  >
+                    {form.useCustomSchedule ? (
+                      <ToggleRight className="w-7 h-7" />
+                    ) : (
+                      <ToggleLeft className="w-7 h-7 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+
+                {!form.useCustomSchedule ? (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Varsayılan mesai saatleri kullanılacak. Özel mesai tanımlamak için
+                    toggle'ı aktifleştirin.
+                  </p>
+                ) : (
+                  <div className="space-y-3 bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                          Mesai Başlangıcı
+                        </label>
+                        <input
+                          type="time"
+                          value={form.workStartTime}
+                          onChange={(e) => setForm({ ...form, workStartTime: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0078d4] focus:border-transparent outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                          Mesai Bitişi
+                        </label>
+                        <input
+                          type="time"
+                          value={form.workEndTime}
+                          onChange={(e) => setForm({ ...form, workEndTime: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0078d4] focus:border-transparent outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Esnek Mesai */}
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                      <div>
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                          Esnek Mesai
+                        </span>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Giriş toleransı, çıkış girişe göre hesaplanır
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, isFlexible: !form.isFlexible })}
+                        className="text-[#0078d4] hover:opacity-80 transition-opacity"
+                      >
+                        {form.isFlexible ? (
+                          <ToggleRight className="w-7 h-7" />
+                        ) : (
+                          <ToggleLeft className="w-7 h-7 text-gray-400" />
+                        )}
+                      </button>
+                    </div>
+
+                    {form.isFlexible && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                          Giriş Toleransı (dakika)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={240}
+                          value={form.flexGraceMinutes}
+                          onChange={(e) =>
+                            setForm({ ...form, flexGraceMinutes: Number(e.target.value) })
+                          }
+                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0078d4] focus:border-transparent outline-none"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">
+                          Örn: 60 dk tolerans ile {form.workStartTime}–
+                          {(() => {
+                            const [h, m] = form.workStartTime.split(':').map(Number);
+                            const t = h * 60 + m + form.flexGraceMinutes;
+                            return `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+                          })()}{' '}
+                          arası giriş geç sayılmaz
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
