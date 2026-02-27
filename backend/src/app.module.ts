@@ -20,7 +20,9 @@ import { BackupModule } from './backup/backup.module';
 import { SupervisorModule } from './supervisor/supervisor.module';
 import { WorkSchedulesModule } from './work-schedules/work-schedules.module';
 import { EmailModule } from './email/email.module';
-import { User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettings, Holiday, AuditLog, BackupHistory, PersonnelDevice, WorkSchedule, EmailLog } from './entities';
+import { MessagingModule } from './messaging/messaging.module';
+import { OperatorPanelModule } from './operator-panel/operator-panel.module';
+import { User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettings, Holiday, AuditLog, BackupHistory, PersonnelDevice, WorkSchedule, EmailLog, TempCardAssignment } from './entities';
 
 @Module({
   imports: [
@@ -34,7 +36,7 @@ import { User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettin
         username: config.get('DB_USERNAME', 'pdks'),
         password: config.get('DB_PASSWORD', 'pdks123'),
         database: config.get('DB_DATABASE', 'pdks'),
-        entities: [User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettings, Holiday, AuditLog, BackupHistory, PersonnelDevice, WorkSchedule, EmailLog],
+        entities: [User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettings, Holiday, AuditLog, BackupHistory, PersonnelDevice, WorkSchedule, EmailLog, TempCardAssignment],
         synchronize: true, // DEV only
       }),
     }),
@@ -57,6 +59,8 @@ import { User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettin
     SupervisorModule,
     WorkSchedulesModule,
     EmailModule,
+    MessagingModule,
+    OperatorPanelModule,
   ],
 })
 export class AppModule {}

@@ -11,3 +11,4 @@ export { BackupHistory } from './backup-history.entity';
 export { PersonnelDevice } from './personnel-device.entity';
 export { WorkSchedule } from './work-schedule.entity';
 export { EmailLog } from './email-log.entity';
+export { TempCardAssignment } from './temp-card-assignment.entity';

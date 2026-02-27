@@ -13,6 +13,9 @@ export class EmailLog {
   @Column({ type: 'varchar', length: 50 })
   type: string; // 'absence_warning' | 'hr_daily_report' | 'system_error' | 'test'
 
+  @Column({ type: 'varchar', length: 20, default: 'email' })
+  channel: string; // 'email' | 'whatsapp'
+
   @Column({ type: 'text' })
   recipients: string;
 

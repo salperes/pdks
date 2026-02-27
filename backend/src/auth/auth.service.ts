@@ -171,6 +171,7 @@ export class AuthService {
       fullName: user.fullName,
       email: user.email,
       role: user.role,
+      defaultLocationId: user.defaultLocationId ?? null,
     };
   }
 }

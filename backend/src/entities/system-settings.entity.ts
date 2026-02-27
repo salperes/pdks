@@ -28,7 +28,7 @@ export class SystemSettings {
   @Column({ type: 'int', default: 7, name: 'backup_retention_days' })
   backupRetentionDays: number;
 
-  /* ── E-posta / SMTP ─────────────────────── */
+  /* ── E-posta / SMTP — @deprecated: msgService'e taşındı ── */
 
   @Column({ type: 'varchar', length: 255, nullable: true, name: 'smtp_host' })
   smtpHost: string | null;
@@ -37,7 +37,7 @@ export class SystemSettings {
   smtpPort: number;
 
   @Column({ type: 'varchar', length: 10, default: 'TLS', name: 'smtp_security' })
-  smtpSecurity: string; // 'none' | 'TLS' | 'SSL'
+  smtpSecurity: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true, name: 'smtp_username' })
   smtpUsername: string | null;
@@ -65,6 +65,15 @@ export class SystemSettings {
   @Column({ type: 'varchar', length: 5, default: '18:00', name: 'notify_absence_time' })
   notifyAbsenceTime: string;
 
+  @Column({ type: 'boolean', default: true, name: 'notify_absence_email_enabled' })
+  notifyAbsenceEmailEnabled: boolean;
+
+  @Column({ type: 'boolean', default: false, name: 'notify_absence_wa_enabled' })
+  notifyAbsenceWaEnabled: boolean;
+
+  @Column({ type: 'simple-array', nullable: true, name: 'notify_absence_wa_recipients' })
+  notifyAbsenceWaRecipients: string[] | null;
+
   @Column({ type: 'boolean', default: false, name: 'notify_hr_enabled' })
   notifyHrEnabled: boolean;
 
@@ -74,11 +83,40 @@ export class SystemSettings {
   @Column({ type: 'varchar', length: 5, default: '18:30', name: 'notify_hr_time' })
   notifyHrTime: string;
 
+  @Column({ type: 'boolean', default: true, name: 'notify_hr_email_enabled' })
+  notifyHrEmailEnabled: boolean;
+
+  @Column({ type: 'boolean', default: false, name: 'notify_hr_wa_enabled' })
+  notifyHrWaEnabled: boolean;
+
+  @Column({ type: 'simple-array', nullable: true, name: 'notify_hr_wa_recipients' })
+  notifyHrWaRecipients: string[] | null;
+
   @Column({ type: 'boolean', default: false, name: 'notify_system_error_enabled' })
   notifySystemErrorEnabled: boolean;
 
   @Column({ type: 'simple-array', nullable: true, name: 'notify_system_error_recipients' })
   notifySystemErrorRecipients: string[] | null;
+
+  @Column({ type: 'boolean', default: true, name: 'notify_system_error_email_enabled' })
+  notifySystemErrorEmailEnabled: boolean;
+
+  @Column({ type: 'boolean', default: false, name: 'notify_system_error_wa_enabled' })
+  notifySystemErrorWaEnabled: boolean;
+
+  @Column({ type: 'simple-array', nullable: true, name: 'notify_system_error_wa_recipients' })
+  notifySystemErrorWaRecipients: string[] | null;
+
+  /* ── Mesajlaşma Servisi (msgService) ──── */
+
+  @Column({ type: 'varchar', length: 255, nullable: true, name: 'msg_service_url' })
+  msgServiceUrl: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true, name: 'msg_service_api_key' })
+  msgServiceApiKey: string | null;
+
+  @Column({ type: 'boolean', default: false, name: 'msg_service_enabled' })
+  msgServiceEnabled: boolean;
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Interval } from '@nestjs/schedule';
+import { exec } from 'child_process';
 import { Device, AccessLog, Personnel, SyncHistory } from '../entities';
 import { ZktecoClientService } from './zkteco-client.service';
 import { EmailService } from '../email/email.service';
@@ -51,9 +52,34 @@ export class SyncService {
         return;
       }
 
-      this.logger.log(`Starting sync for ${reachable.length} device(s)`);
+      // Ping check: only sync devices that respond
+      const pingResults = await Promise.all(
+        reachable.map(async (d) => ({
+          device: d,
+          alive: await this.isReachable(d.ipAddress),
+        })),
+      );
+      const alive = pingResults.filter((r) => r.alive).map((r) => r.device);
+      const dead = pingResults.filter((r) => !r.alive).map((r) => r.device);
 
-      for (const device of reachable) {
+      if (dead.length > 0) {
+        this.logger.debug(
+          `Ping failed (skipping): ${dead.map((d) => d.name).join(', ')}`,
+        );
+        // Mark unreachable devices as offline
+        for (const d of dead) {
+          await this.deviceRepository.update(d.id, { isOnline: false }).catch(() => {});
+        }
+      }
+
+      if (alive.length === 0) {
+        this.logger.debug('No reachable devices, skipping sync');
+        return;
+      }
+
+      this.logger.log(`Starting sync for ${alive.length}/${reachable.length} reachable device(s)`);
+
+      for (const device of alive) {
         try {
           const result = await this.syncDevice(device);
           if (result.recordsSynced > 0) {
@@ -231,6 +257,15 @@ export class SyncService {
 
     await this.accessLogRepository.save(accessLog);
     return true;
+  }
+
+  private isReachable(ip: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      // Alpine Linux ping: -c 1 = one packet, -W 2 = 2s timeout
+      exec(`ping -c 1 -W 2 ${ip}`, (error) => {
+        resolve(!error);
+      });
+    });
   }
 
   private async findPersonnelByDeviceUser(deviceUserId: number): Promise<Personnel | null> {

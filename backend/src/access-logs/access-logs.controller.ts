@@ -6,6 +6,7 @@ import {
   Body,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { UserRole } from '../entities';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -16,6 +17,7 @@ import { AccessLogsService } from './access-logs.service';
 import { QueryAccessLogsDto } from './dto/query-access-logs.dto';
 import type { AuthUser } from '../auth/interfaces';
 
+@ApiTags('Access Logs')
 @Controller('access-logs')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AccessLogsController {

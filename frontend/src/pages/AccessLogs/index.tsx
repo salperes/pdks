@@ -18,6 +18,7 @@ import {
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { formatDateTime, formatTime } from '../../utils/date';
+import DateInput from '../../components/DateInput';
 import type { AccessLog, Device, Location, PaginatedResponse } from '../../types';
 
 const AUTO_REFRESH_INTERVAL = 30_000;
@@ -532,10 +533,9 @@ export const AccessLogsPage = () => {
                 <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-1 hidden sm:block" />
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-400" />
-                  <input
-                    type="date"
+                  <DateInput
                     value={pairedDate}
-                    onChange={(e) => setPairedDate(e.target.value)}
+                    onChange={(v) => setPairedDate(v)}
                     className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0078d4] focus:border-transparent"
                   />
                 </div>
@@ -611,10 +611,9 @@ export const AccessLogsPage = () => {
                   Başlangıç Tarihi
                 </span>
               </label>
-              <input
-                type="date"
+              <DateInput
                 value={filters.startDate}
-                onChange={(e) => setFilters((f) => ({ ...f, startDate: e.target.value }))}
+                onChange={(v) => setFilters((f) => ({ ...f, startDate: v }))}
                 className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0078d4] focus:border-transparent"
               />
             </div>
@@ -627,10 +626,9 @@ export const AccessLogsPage = () => {
                   Bitiş Tarihi
                 </span>
               </label>
-              <input
-                type="date"
+              <DateInput
                 value={filters.endDate}
-                onChange={(e) => setFilters((f) => ({ ...f, endDate: e.target.value }))}
+                onChange={(v) => setFilters((f) => ({ ...f, endDate: v }))}
                 className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0078d4] focus:border-transparent"
               />
             </div>

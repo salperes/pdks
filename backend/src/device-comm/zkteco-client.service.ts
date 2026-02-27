@@ -20,7 +20,7 @@ export class ZktecoClientService {
     private readonly udpUserPacketFormat = new Map<string, 28 | 72>();
     getNextInPort() {
         const port = this.nextInPort;
-        this.nextInPort = this.nextInPort >= 5300 ? 5200 : this.nextInPort + 1;
+        this.nextInPort = this.nextInPort >= 5500 ? 5200 : this.nextInPort + 1;
         return port;
     }
     getReplyCommand(reply) {
@@ -99,30 +99,43 @@ export class ZktecoClientService {
             return zk;
         }
         catch {
+            // Clean up partially opened socket before trying UDP
+            try { await zk.disconnect(); } catch {}
             this.logger.warn(`TCP failed for ${ip}:${port}, trying UDP directly...`);
         }
-        const udpInPort = this.getNextInPort();
-        const zudp = new ZUDP(ip, port, 10000, udpInPort);
-        try {
-            await zudp.createSocket(null, null);
-            await zudp.connect();
-            if (commKey) {
-                this.logger.log(`Authenticating with commKey on ${ip}:${port} (UDP)...`);
-                await this.authenticateWithCommKey(zudp, commKey, 'UDP');
+        // Try UDP with retry on EADDRINUSE (port still bound from previous connection)
+        const maxRetries = 10;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            const udpInPort = this.getNextInPort();
+            const zudp = new ZUDP(ip, port, 10000, udpInPort);
+            try {
+                await zudp.createSocket(null, null);
+                await zudp.connect();
+                if (commKey) {
+                    this.logger.log(`Authenticating with commKey on ${ip}:${port} (UDP)...`);
+                    await this.authenticateWithCommKey(zudp, commKey, 'UDP');
+                }
+                try {
+                    const info = await zudp.getInfo();
+                    this.logger.log(`Connected to device at ${ip}:${port} via UDP on inport ${udpInPort} (users: ${info?.userCounts}, logs: ${info?.logCounts})`);
+                }
+                catch {
+                    this.logger.log(`Connected to device at ${ip}:${port} via UDP on inport ${udpInPort} (getInfo not supported)`);
+                }
+                return zudp;
+            }
+            catch (error) {
+                // Clean up failed socket
+                try { if (zudp.socket) zudp.socket.close(); } catch {}
+                if (error?.code === 'EADDRINUSE' && attempt < maxRetries - 1) {
+                    this.logger.warn(`Port ${udpInPort} in use, trying next port (attempt ${attempt + 1}/${maxRetries})`);
+                    continue;
+                }
+                this.logger.error(`Failed to connect to device at ${ip}:${port}`, error);
+                throw error;
             }
         }
-        catch (error) {
-            this.logger.error(`Failed to connect to device at ${ip}:${port}`, error);
-            throw error;
-        }
-        try {
-            const info = await zudp.getInfo();
-            this.logger.log(`Connected to device at ${ip}:${port} via UDP on inport ${udpInPort} (users: ${info?.userCounts}, logs: ${info?.logCounts})`);
-        }
-        catch {
-            this.logger.log(`Connected to device at ${ip}:${port} via UDP on inport ${udpInPort} (getInfo not supported)`);
-        }
-        return zudp;
+        throw new Error(`Failed to connect to ${ip}:${port} — all UDP ports busy after ${maxRetries} attempts`);
     }
     getUdpClient(client) {
         if (client &&
@@ -429,6 +442,25 @@ export class ZktecoClientService {
         catch (error) {
             this.logger.warn('Error during device disconnect', error);
         }
+        // Ensure UDP socket is fully closed to release the port
+        try {
+            const udp = this.getUdpClient(zk);
+            if (udp?.socket) {
+                udp.socket.removeAllListeners();
+                udp.socket.close();
+            }
+        } catch {}
+        try {
+            if (zk?.zudp?.socket) {
+                zk.zudp.socket.removeAllListeners();
+                zk.zudp.socket.close();
+            }
+        } catch {}
+        try {
+            if (zk?.ztcp?.socket) {
+                zk.ztcp.socket.destroy();
+            }
+        } catch {}
     }
     async getInfo(zk) {
         try {

@@ -10,6 +10,7 @@ import {
   Clock,
   Settings,
   LogOut,
+  CreditCard,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
@@ -25,6 +26,10 @@ const navItems: NavItem[] = [
   { path: '/personnel', icon: Users, label: 'Personel' },
   { path: '/access-logs', icon: ClipboardList, label: 'Geçiş Kayıtları' },
   { path: '/reports', icon: BarChart3, label: 'Raporlar' },
+];
+
+const operatorItems: NavItem[] = [
+  { path: '/operator-panel', icon: CreditCard, label: 'Operatör Paneli' },
 ];
 
 const adminItems: NavItem[] = [
@@ -77,15 +82,31 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         }`}
       >
         <nav className="flex-1 py-4 overflow-y-auto">
-          <div className="space-y-1 px-3">{navItems.map(renderNavItem)}</div>
+          {/* Operatör sadece operatör panelini görür */}
+          {user?.role === 'operator' ? (
+            <div className="space-y-1 px-3">{operatorItems.map(renderNavItem)}</div>
+          ) : (
+            <>
+              <div className="space-y-1 px-3">{navItems.map(renderNavItem)}</div>
 
-          {user?.role === 'admin' && (
-            <div className="mt-6 px-3">
-              <p className="px-3 mb-2 text-xs text-gray-400 uppercase tracking-wider">
-                Yönetim
-              </p>
-              <div className="space-y-1">{adminItems.map(renderNavItem)}</div>
-            </div>
+              {user?.role === 'admin' && (
+                <div className="mt-6 px-3">
+                  <p className="px-3 mb-2 text-xs text-gray-400 uppercase tracking-wider">
+                    Operasyon
+                  </p>
+                  <div className="space-y-1">{operatorItems.map(renderNavItem)}</div>
+                </div>
+              )}
+
+              {user?.role === 'admin' && (
+                <div className="mt-6 px-3">
+                  <p className="px-3 mb-2 text-xs text-gray-400 uppercase tracking-wider">
+                    Yönetim
+                  </p>
+                  <div className="space-y-1">{adminItems.map(renderNavItem)}</div>
+                </div>
+              )}
+            </>
           )}
         </nav>
 

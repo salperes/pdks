@@ -5,6 +5,29 @@ export interface User {
   email: string;
   role: 'admin' | 'operator' | 'viewer';
   isActive: boolean;
+  defaultLocationId?: string | null;
+  createdAt: string;
+}
+
+export interface TempCardAssignment {
+  id: string;
+  personnelId: string;
+  personnel?: Personnel;
+  tempCardNumber: string;
+  tempUid: number;
+  reason: 'forgot_card' | 'guest';
+  note?: string | null;
+  documentType?: string | null;
+  shelfNo?: string | null;
+  visitedPersonnelId?: string | null;
+  visitedPersonnel?: Personnel | null;
+  visitReason?: string | null;
+  deviceIds: string[];
+  expiresAt: string;
+  status: 'active' | 'expired' | 'revoked';
+  issuedBy: string;
+  issuer?: User;
+  revokedAt?: string | null;
   createdAt: string;
 }
 

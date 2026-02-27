@@ -20,11 +20,10 @@ export class DeviceManagerService implements OnModuleInit, OnModuleDestroy {
       where: { isActive: true },
     });
 
-    this.logger.log(`Found ${activeDevices.length} active device(s). Connecting...`);
-
-    for (const device of activeDevices) {
-      await this.connectDevice(device);
-    }
+    this.logger.log(
+      `Found ${activeDevices.length} active device(s). ` +
+      `Connections will be created on-demand (sync handles periodic connectivity).`,
+    );
   }
 
   async onModuleDestroy(): Promise<void> {

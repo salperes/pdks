@@ -9,6 +9,7 @@ import {
   UseGuards,
   NotFoundException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { UserRole } from '../entities';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -19,6 +20,7 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import { BackupService } from './backup.service';
 import type { AuthUser } from '../auth/interfaces';
 
+@ApiTags('Backup')
 @Controller('backup')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)

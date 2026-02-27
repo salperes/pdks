@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Query, Req, Res, Logger } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import * as express from 'express';
 import { AdmsService } from './adms.service';
 
@@ -10,6 +11,7 @@ import { AdmsService } from './adms.service';
  *
  * Routes are at /iclock/* (excluded from the /api/v1 global prefix).
  */
+@ApiTags('ADMS')
 @Controller('iclock')
 export class AdmsController {
   private readonly logger = new Logger(AdmsController.name);

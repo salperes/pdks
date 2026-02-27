@@ -8,6 +8,7 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { UserRole } from '../entities';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -17,6 +18,7 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import { SettingsService } from './settings.service';
 import type { AuthUser } from '../auth/interfaces';
 
+@ApiTags('Settings')
 @Controller('settings')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SettingsController {
@@ -55,11 +57,23 @@ export class SettingsController {
       notifyAbsenceEnabled?: boolean;
       notifyAbsenceRecipients?: string[];
       notifyAbsenceTime?: string;
+      notifyAbsenceEmailEnabled?: boolean;
+      notifyAbsenceWaEnabled?: boolean;
+      notifyAbsenceWaRecipients?: string[];
       notifyHrEnabled?: boolean;
       notifyHrRecipients?: string[];
       notifyHrTime?: string;
+      notifyHrEmailEnabled?: boolean;
+      notifyHrWaEnabled?: boolean;
+      notifyHrWaRecipients?: string[];
       notifySystemErrorEnabled?: boolean;
       notifySystemErrorRecipients?: string[];
+      notifySystemErrorEmailEnabled?: boolean;
+      notifySystemErrorWaEnabled?: boolean;
+      notifySystemErrorWaRecipients?: string[];
+      msgServiceUrl?: string;
+      msgServiceApiKey?: string;
+      msgServiceEnabled?: boolean;
     },
   ) {
     const result = await this.settingsService.updateSettings(data);

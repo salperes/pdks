@@ -74,6 +74,7 @@ export class UsersService implements OnModuleInit {
       fullName: dto.fullName,
       email: dto.email,
       role: dto.role ?? UserRole.VIEWER,
+      defaultLocationId: dto.defaultLocationId || null,
     });
     return this.usersRepository.save(user);
   }

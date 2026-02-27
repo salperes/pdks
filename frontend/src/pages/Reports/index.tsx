@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { formatDate, formatTime } from '../../utils/date';
+import DateInput from '../../components/DateInput';
 
 /* ────────────────── types ────────────────── */
 
@@ -439,10 +440,9 @@ export const ReportsPage = () => {
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
                   Tarih
                 </label>
-                <input
-                  type="date"
+                <DateInput
                   value={dailyDate}
-                  onChange={(e) => setDailyDate(e.target.value)}
+                  onChange={(v) => setDailyDate(v)}
                   className={inputClass}
                 />
               </div>
@@ -787,10 +787,9 @@ export const ReportsPage = () => {
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
                   Başlangıç
                 </label>
-                <input
-                  type="date"
+                <DateInput
                   value={deptStart}
-                  onChange={(e) => setDeptStart(e.target.value)}
+                  onChange={(v) => setDeptStart(v)}
                   className={inputClass}
                 />
               </div>
@@ -798,10 +797,9 @@ export const ReportsPage = () => {
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
                   Bitiş
                 </label>
-                <input
-                  type="date"
+                <DateInput
                   value={deptEnd}
-                  onChange={(e) => setDeptEnd(e.target.value)}
+                  onChange={(v) => setDeptEnd(v)}
                   className={inputClass}
                 />
               </div>

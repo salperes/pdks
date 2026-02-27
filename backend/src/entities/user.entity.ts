@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Location } from './location.entity';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -34,6 +37,13 @@ export class User {
 
   @Column({ type: 'boolean', default: true, name: 'is_active' })
   isActive: boolean;
+
+  @Column({ type: 'uuid', nullable: true, name: 'default_location_id' })
+  defaultLocationId: string | null;
+
+  @ManyToOne(() => Location, { nullable: true, eager: true })
+  @JoinColumn({ name: 'default_location_id' })
+  defaultLocation: Location | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

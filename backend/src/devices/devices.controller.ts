@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { UserRole, Personnel } from '../entities';
 import { PersonnelService } from '../personnel/personnel.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -24,6 +25,7 @@ import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
 import type { AuthUser } from '../auth/interfaces';
 
+@ApiTags('Devices')
 @Controller('devices')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DevicesController {

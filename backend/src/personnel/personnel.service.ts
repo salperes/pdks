@@ -133,6 +133,12 @@ export class PersonnelService {
     await this.personnelRepository.remove(personnel);
   }
 
+  async updatePhoto(id: string, photoUrl: string | null): Promise<Personnel> {
+    const personnel = await this.findById(id);
+    personnel.photoUrl = photoUrl;
+    return this.personnelRepository.save(personnel);
+  }
+
   async deleteBulk(ids: string[]): Promise<{ deleted: number }> {
     if (!ids || ids.length === 0) return { deleted: 0 };
     const result = await this.personnelRepository

@@ -8,7 +8,14 @@ import {
   Body,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { UserRole } from '../entities';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -20,6 +27,7 @@ import { CreatePersonnelDto } from './dto/create-personnel.dto';
 import { UpdatePersonnelDto } from './dto/update-personnel.dto';
 import type { AuthUser } from '../auth/interfaces';
 
+@ApiTags('Personnel')
 @Controller('personnel')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PersonnelController {
@@ -138,5 +146,40 @@ export class PersonnelController {
       targetEntity: 'Personnel',
       targetId: id,
     });
+  }
+
+  @Post(':id/photo')
+  @Roles(UserRole.ADMIN, UserRole.OPERATOR)
+  @UseInterceptors(
+    FileInterceptor('photo', {
+      storage: diskStorage({
+        destination: './uploads/photos',
+        filename: (_req, file, cb) => {
+          const id = _req.params.id;
+          cb(null, `${id}${extname(file.originalname)}`);
+        },
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        if (!file.mimetype.match(/^image\/(jpeg|png|webp)$/)) {
+          cb(new BadRequestException('Sadece JPEG, PNG, WEBP dosyaları kabul edilir'), false);
+          return;
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadPhoto(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const photoUrl = `/uploads/photos/${file.filename}`;
+    return this.personnelService.updatePhoto(id, photoUrl);
+  }
+
+  @Delete(':id/photo')
+  @Roles(UserRole.ADMIN, UserRole.OPERATOR)
+  async deletePhoto(@Param('id') id: string) {
+    return this.personnelService.updatePhoto(id, null);
   }
 }

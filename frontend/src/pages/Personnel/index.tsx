@@ -17,6 +17,8 @@ import {
   ToggleRight,
   Clock,
   Calendar,
+  Camera,
+  ImageOff,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
@@ -156,6 +158,10 @@ export const PersonnelPage = () => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [enrollingDeviceId, setEnrollingDeviceId] = useState<string | null>(null);
 
+  /* ---- Photo upload state ---- */
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [editingPhotoUrl, setEditingPhotoUrl] = useState<string | null>(null);
+
   /* ---- Import modal ---- */
   const [importOpen, setImportOpen] = useState(false);
   const [csvText, setCsvText] = useState('');
@@ -280,6 +286,7 @@ export const PersonnelPage = () => {
 
   const openEditModal = (p: Personnel) => {
     setEditingId(p.id);
+    setEditingPhotoUrl(p.photoUrl || null);
     setForm({
       firstName: p.firstName,
       lastName: p.lastName,
@@ -299,6 +306,7 @@ export const PersonnelPage = () => {
     setModalOpen(false);
     setEditingId(null);
     setForm(emptyForm);
+    setEditingPhotoUrl(null);
   };
 
   /* ---------- Save (create / update) ---------- */
@@ -488,6 +496,46 @@ export const PersonnelPage = () => {
       showToast('İçe aktarma sırasında hata oluştu.', 'error');
     } finally {
       setImporting(false);
+    }
+  };
+
+  /* ---------- Photo upload / delete ---------- */
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingId) return;
+    e.target.value = '';
+
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    setPhotoUploading(true);
+    try {
+      const res = await api.post(`/personnel/${editingId}/photo`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setEditingPhotoUrl(res.data.photoUrl);
+      showToast('Fotoğraf yüklendi.', 'success');
+      fetchPersonnel(page, search, departmentFilter);
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || 'Fotoğraf yüklenemedi.', 'error');
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  const handlePhotoDelete = async () => {
+    if (!editingId) return;
+    setPhotoUploading(true);
+    try {
+      await api.delete(`/personnel/${editingId}/photo`);
+      setEditingPhotoUrl(null);
+      showToast('Fotoğraf silindi.', 'success');
+      fetchPersonnel(page, search, departmentFilter);
+    } catch {
+      showToast('Fotoğraf silinemedi.', 'error');
+    } finally {
+      setPhotoUploading(false);
     }
   };
 
@@ -691,10 +739,18 @@ export const PersonnelPage = () => {
                     )}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#0078d4]/10 text-[#0078d4] flex items-center justify-center text-xs font-bold flex-shrink-0">
-                          {p.firstName.charAt(0)}
-                          {p.lastName.charAt(0)}
-                        </div>
+                        {p.photoUrl ? (
+                          <img
+                            src={p.photoUrl}
+                            alt={`${p.firstName} ${p.lastName}`}
+                            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-[#0078d4]/10 text-[#0078d4] flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            {p.firstName.charAt(0)}
+                            {p.lastName.charAt(0)}
+                          </div>
+                        )}
                         <div>
                           <span className="font-medium text-gray-900 dark:text-white">
                             {p.firstName} {p.lastName}
@@ -871,6 +927,42 @@ export const PersonnelPage = () => {
             </div>
 
             <div className="p-4 space-y-4">
+              {/* Photo upload (only in edit mode) */}
+              {editingId && (
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0 border-2 border-gray-200 dark:border-gray-600">
+                    {editingPhotoUrl ? (
+                      <img src={editingPhotoUrl} alt="Foto" className="w-full h-full object-cover" />
+                    ) : (
+                      <Camera className="w-6 h-6 text-gray-400" />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0078d4] hover:bg-[#106eba] text-white text-xs font-medium cursor-pointer transition-colors">
+                      <Upload className="w-3.5 h-3.5" />
+                      {photoUploading ? 'Yükleniyor...' : 'Fotoğraf Yükle'}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handlePhotoUpload}
+                        disabled={photoUploading}
+                        className="hidden"
+                      />
+                    </label>
+                    {editingPhotoUrl && (
+                      <button
+                        onClick={handlePhotoDelete}
+                        disabled={photoUploading}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 text-xs font-medium transition-colors disabled:opacity-50"
+                      >
+                        <ImageOff className="w-3.5 h-3.5" />
+                        Fotoğrafı Kaldır
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField label="Ad" required value={form.firstName} onChange={(v) => updateField('firstName', v)} />
                 <FormField label="Soyad" required value={form.lastName} onChange={(v) => updateField('lastName', v)} />
@@ -1029,7 +1121,7 @@ export const PersonnelPage = () => {
               <div className="p-4 space-y-4">
                 {/* Personel bilgisi */}
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-[#0078d4]/10 text-[#0078d4] flex items-center justify-center text-lg font-bold">
+                  <div className="w-12 h-12 rounded-full bg-[#0078d4]/10 text-[#0078d4] flex items-center justify-center text-lg font-bold overflow-hidden flex-shrink-0">
                     {statsData.personnel.firstName.charAt(0)}
                     {statsData.personnel.lastName.charAt(0)}
                   </div>

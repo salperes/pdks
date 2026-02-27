@@ -9,6 +9,7 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators';
 import { JwtAuthGuard } from '../common/guards';
 import { AuthService } from './auth.service';
@@ -16,6 +17,7 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import { LoginDto, RefreshTokenDto, ChangePasswordDto } from './dto';
 import type { AuthResponse, AuthUser } from './interfaces';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(

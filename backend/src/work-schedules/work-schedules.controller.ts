@@ -1,8 +1,10 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { WorkSchedulesService } from './work-schedules.service';
 import { CreateWorkScheduleDto, UpdateWorkScheduleDto } from './dto/create-work-schedule.dto';
 
+@ApiTags('Work Schedules')
 @Controller('work-schedules')
 @UseGuards(JwtAuthGuard)
 export class WorkSchedulesController {

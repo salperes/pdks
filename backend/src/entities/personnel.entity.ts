@@ -46,7 +46,7 @@ export class Personnel {
   email: string;
 
   @Column({ type: 'varchar', length: 500, nullable: true, name: 'photo_url' })
-  photoUrl: string;
+  photoUrl: string | null;
 
   @Column({ type: 'boolean', default: true, name: 'is_active' })
   isActive: boolean;

@@ -6,6 +6,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { UserRole } from '../entities';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -14,6 +15,7 @@ import { CurrentUser } from '../common/decorators';
 import { SupervisorService } from './supervisor.service';
 import type { AuthUser } from '../auth/interfaces';
 
+@ApiTags('Supervisor')
 @Controller('supervisor')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)

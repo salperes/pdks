@@ -13,6 +13,7 @@ import { ReportsPage } from './pages/Reports';
 import { SettingsPage } from './pages/Settings';
 import { SupervisorPage } from './pages/Supervisor';
 import { WorkSchedulesPage } from './pages/WorkSchedules';
+import { OperatorPanelPage } from './pages/OperatorPanel';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -25,6 +26,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     // SSO token parametresini login sayfasına taşı
     const loginPath = location.search ? `/login${location.search}` : '/login';
     return <Navigate to={loginPath} replace />;
+  }
+  return <>{children}</>;
+};
+
+/** Operatör rolü sadece /operator-panel erişebilir */
+const OperatorRedirect = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuthStore();
+  if (user?.role === 'operator') {
+    return <Navigate to="/operator-panel" replace />;
   }
   return <>{children}</>;
 };
@@ -43,16 +53,17 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<DashboardPage />} />
-            <Route path="personnel" element={<PersonnelPage />} />
-            <Route path="access-logs" element={<AccessLogsPage />} />
-            <Route path="reports" element={<ReportsPage />} />
-            <Route path="devices" element={<DevicesPage />} />
-            <Route path="supervisor" element={<SupervisorPage />} />
-            <Route path="locations" element={<LocationsPage />} />
-            <Route path="admin/users" element={<UsersPage />} />
-            <Route path="admin/work-schedules" element={<WorkSchedulesPage />} />
-            <Route path="admin/settings" element={<SettingsPage />} />
+            <Route index element={<OperatorRedirect><DashboardPage /></OperatorRedirect>} />
+            <Route path="personnel" element={<OperatorRedirect><PersonnelPage /></OperatorRedirect>} />
+            <Route path="access-logs" element={<OperatorRedirect><AccessLogsPage /></OperatorRedirect>} />
+            <Route path="reports" element={<OperatorRedirect><ReportsPage /></OperatorRedirect>} />
+            <Route path="devices" element={<OperatorRedirect><DevicesPage /></OperatorRedirect>} />
+            <Route path="supervisor" element={<OperatorRedirect><SupervisorPage /></OperatorRedirect>} />
+            <Route path="operator-panel" element={<OperatorPanelPage />} />
+            <Route path="locations" element={<OperatorRedirect><LocationsPage /></OperatorRedirect>} />
+            <Route path="admin/users" element={<OperatorRedirect><UsersPage /></OperatorRedirect>} />
+            <Route path="admin/work-schedules" element={<OperatorRedirect><WorkSchedulesPage /></OperatorRedirect>} />
+            <Route path="admin/settings" element={<OperatorRedirect><SettingsPage /></OperatorRedirect>} />
           </Route>
         </Routes>
       </BrowserRouter>

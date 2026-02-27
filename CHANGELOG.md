@@ -2,189 +2,201 @@
 
 > Max 11 kayıt tutulur. 11 kayıt dolunca eski 1-10 arşivlenir (`temp/changelog{NNN}-{NNN}.md`),
 > yeni dosya eski dosyanın son kaydıyla başlar (bağlam referansı olarak).
-> Arşiv: temp/changelog_001-010.md, temp/changelog_010-020.md
+> Arşiv: temp/changelog_001-010.md, temp/changelog_010-020.md, temp/changelog_020-029.md
 
 ---------------------------------------------------------
-Rev. ID    : 020
-Rev. Date  : 19.02.2026
-Rev. Time  : 14:45:00
-Rev. Prompt: Portal SSO entegrasyonu — tek tıkla giriş
+Rev. ID    : 028
+Rev. Date  : 22.02.2026
+Rev. Time  : 17:58:54
+Rev. Prompt: Bildirim sistemi msgService'e taşıma — çift kanal (e-posta + WhatsApp)
 
 Rev. Report: (
-  Portal uygulamasından SSO ile gelen kullanıcıların PDKS'ye otomatik giriş
-  yapabilmesi sağlandı. Portal, HS256 ile imzalanmış kısa ömürlü (5dk) JWT
-  üretip PDKS URL'sine sso_token parametresi olarak ekliyor. PDKS bu token'ı
-  doğrulayıp kullanıcıyı kendi veritabanında arayarak oturum açıyor.
+  Tüm bildirim gönderimlerini nodemailer/SMTP'den msgService API'sine taşıdı.
+  E-posta Ayarları kartı kaldırıldı, bildirim türleri Mesajlaşma Servisi altına
+  birleştirildi. Her bildirim türü artık hem e-posta hem WhatsApp kanalını
+  bağımsız olarak destekliyor.
 
-  BACKEND — ORTAM DEĞİŞKENLERİ:
-  - .env.example: SSO_SECRET_KEY eklendi
-  - docker-compose.yml: backend servisine SSO_SECRET_KEY env var eklendi
+  BACKEND — SystemSettings Entity:
+  - 9 yeni kolon eklendi (her bildirim türü için email/WA toggle + WA alıcıları):
+    notify_absence_email_enabled, notify_absence_wa_enabled, notify_absence_wa_recipients,
+    notify_hr_email_enabled, notify_hr_wa_enabled, notify_hr_wa_recipients,
+    notify_system_error_email_enabled, notify_system_error_wa_enabled,
+    notify_system_error_wa_recipients
+  - SMTP kolonları @deprecated olarak işaretlendi (silinmedi, kullanılmıyor)
 
-  BACKEND — AUTH SERVICE:
-  - loginWithSsoToken(ssoToken): yeni metod
-    1. SSO_SECRET_KEY ile jsonwebtoken.verify (sadece HS256)
-    2. Token'dan username çıkarır
-    3. usersService.findByUsername ile kullanıcı arar
-    4. Kullanıcı yoksa veya pasifse → UnauthorizedException
-    5. Mevcut generateTokens() ile PDKS access + refresh token üretir
-  - Logger eklendi (SSO giriş başarı/başarısız logları)
+  BACKEND — EmailLog Entity:
+  - channel kolonu eklendi (varchar(20), default: 'email') — 'email' | 'whatsapp'
 
-  BACKEND — AUTH CONTROLLER:
-  - GET /api/v1/auth/sso?sso_token=... endpoint eklendi (public, guard yok)
-  - Başarılı girişte SSO_LOGIN audit log kaydı oluşturulur
-  - Normal login response formatı ile aynı: { accessToken, refreshToken, user }
+  BACKEND — EmailModule:
+  - MessagingModule import eklendi (MessagingService enjeksiyonu için)
 
-  FRONTEND — LOGIN SAYFASI:
-  - useEffect ile sso_token query parametresi yakalanıyor
-  - Token varsa: GET /auth/sso çağrılır, başarılıysa token'lar localStorage'a
-    yazılıp authStore güncellenir, Dashboard'a yönlendirilir
-  - URL'den token temizlenir (window.history.replaceState — replay koruması)
-  - SSO işlemi sırasında loading spinner gösteriliyor
-  - Hata durumunda login formu ile birlikte hata mesajı gösteriliyor
-  - useRef ile çift çağrı önleniyor (React strict mode)
+  BACKEND — EmailService (tam refactor):
+  - nodemailer import ve getTransporter() kaldırıldı
+  - MessagingService constructor'a enjekte edildi
+  - sendEmail(): nodemailer yerine messagingService.sendEmail() kullanıyor
+  - Yeni sendWhatsAppNotification(): WA gönderimi + EmailLog kaydı (channel: 'whatsapp')
+  - scheduledCheck(): Guard emailEnabled → msgServiceEnabled olarak değişti
+  - sendAbsenceWarnings(): Çift kanal — e-posta + WhatsApp bağımsız gönderim
+  - sendHrDailyReport(): Çift kanal
+  - sendSystemErrorNotification(): Guard güncellendi + WA kanalı eklendi
+  - testConnection() ve sendTestEmail() kaldırıldı (MessagingController hallediyor)
+  - getEmailLogs(): Opsiyonel channel filtresi eklendi
 
-  GÜVENLİK:
-  - Sadece HS256 algoritması kabul ediliyor (algorithm confusion koruması)
-  - Token süresi 5dk (Portal tarafında ayarlanır)
-  - PDKS'de kayıtlı olmayan kullanıcı girişi reddediliyor
-  - Otomatik kullanıcı oluşturma YOK
-  - Token URL'den hemen temizleniyor
+  BACKEND — EmailController:
+  - POST /email/test-connection kaldırıldı
+  - POST /email/send-test kaldırıldı
+  - GET /email/logs: channel query parametresi eklendi
 
-  PORTAL TARAFINDA GEREKLİ:
-  - SSO_SECRET_KEY paylaşımı (aynı gizli anahtar)
-  - GET /api/integrations/pdks/launch-url endpoint
-  - PDKS kartı eklenmesi (uygulamalar sayfasına)
+  BACKEND — Settings Service/Controller:
+  - Pick tipine ve body tipine 9 yeni alan eklendi
 
-  Değişen backend: 3 (.env.example, auth.service.ts, auth.controller.ts)
-  Değişen config: 1 (docker-compose.yml)
-  Değişen frontend: 1 (Login/index.tsx)
-)
----------------------------------------------------------
-Rev. ID    : 021
-Rev. Date  : 19.02.2026
-Rev. Time  : 17:02:00
-Rev. Prompt: Cihaz lokasyon güncelleme hatası düzeltmesi
+  FRONTEND — Settings Sayfası (büyük refactor):
+  - EmailSettings + MsgServiceSettings interfaceleri → birleşik NotificationSettings
+  - EmailLogEntry → NotificationLogEntry (channel alanı eklendi)
+  - Ayrık state'ler → tek notifSettings state'i
+  - E-posta Ayarları kartı tamamen kaldırıldı
+  - Mesajlaşma Servisi kartı genişletildi → "Mesajlaşma & Bildirimler":
+    · Master toggle + bağlantı ayarları (URL + API Key)
+    · Test butonları (bağlantı, e-posta, WhatsApp)
+    · Bildirim Türleri: her tür için master toggle + kanal toggle'ları
+      - Devamsızlık: saat + e-posta toggle/alıcılar + WA toggle/telefonlar
+      - İK Rapor: saat + e-posta toggle/alıcılar + WA toggle/telefonlar
+      - Sistem Hatası: e-posta toggle/alıcılar + WA toggle/telefonlar
+    · Bildirim Geçmişi tablosu — Kanal kolonu (e-posta mavi / WhatsApp yeşil badge)
 
-Rev. Report: (
-  Cihaz düzenleme modalında lokasyon değişikliğinin kaydedilmemesi sorunu
-  düzeltildi. İki ayrı hata tespit edilip giderildi.
-
-  BACKEND — DEVICES SERVICE:
-  - update() metodu değiştirildi: Object.assign + save yerine
-    repository.update() + findById kullanılıyor
-  - Neden: TypeORM findById ile yüklenen location relation nesnesi,
-    save() sırasında yeni locationId'yi eziyor (relation öncelikli)
-  - Düzeltme: repository.update() doğrudan SQL UPDATE çalıştırır,
-    relation çakışması olmaz
-
-  FRONTEND — CİHAZ SAYFASI:
-  - handleSave payload'ında locationId artık her zaman gönderiliyor
-  - Lokasyon seçildiyse: UUID gönderilir
-  - Lokasyon temizlendiyse: null gönderilir
-  - Önceki: if (form.locationId) koşulu boş string'i atlıyordu
-
-  Değişen backend: 1 (devices.service.ts)
-  Değişen frontend: 1 (Devices/index.tsx)
-)
----------------------------------------------------------
-Rev. ID    : 016
-Rev. Date  : 19.02.2026
-Rev. Time  : 08:55:00
-Rev. Prompt: Cihaz zaman senkronizasyonu (otomatik saat düzeltme)
-
-Rev. Report: (
-  Sync döngüsüne cihaz zaman kontrolü eklendi. Her senkronizasyonda
-  cihaz saati sunucu saatiyle karşılaştırılıyor, 60 saniyeden fazla
-  sapma varsa otomatik düzeltiliyor.
-
-  ZKTECO CLIENT:
-  - setTime(zk, date) metodu eklendi — cihaz saatini ayarlar
-
-  SYNC SERVICE:
-  - checkAndSyncTime() metodu eklendi — her sync öncesi çalışır
-  - Cihaz saatini getTime() ile okur, UTC+3 offset ile sunucu saatine
-    karşılaştırır
-  - Fark > 60s ise setTime() ile düzeltir, log yazar
-  - Hata olursa attendance sync'i engellemez (try-catch)
-  - TIME_SYNC_THRESHOLD_SECONDS = 60 (eşik değer)
-  - TURKEY_OFFSET_MS = 3 saat (UTC+3)
-
-  TEST SONUÇLARI:
-  - Fabrika 2 (192.168.152.233): drift -1s → düzeltme gerekmedi
-  - Fabrika 1 (192.168.204.233): drift -10123000s (~117 gün geri)
-    → otomatik düzeltildi, sonraki döngüde drift 0s
-
-  Değişen dosyalar: 2 (zkteco-client.service.ts, sync.service.ts)
-)
----------------------------------------------------------
-Rev. ID    : 022
-Rev. Date  : 19.02.2026
-Rev. Time  : 17:24:00
-Rev. Prompt: Lokasyon sayfasında cihaz sayısı 0 gösterme hatası düzeltmesi
-
-Rev. Report: (
-  Lokasyonlar sayfasında cihaz sayısının her zaman 0 görünmesi sorunu
-  düzeltildi. Backend ve frontend arasında alan adı uyumsuzluğu vardı.
-
-  BACKEND — LOCATIONS SERVICE:
-  - findAll() içindeki loadRelationCountAndMap alan adı düzeltildi:
-    'l.deviceCount' → 'l.devicesCount'
-  - Frontend Location interface'i 'devicesCount' bekliyor, backend
-    'deviceCount' döndürüyordu → undefined ?? 0 = her zaman 0
-
-  Değişen backend: 1 (locations.service.ts)
-)
----------------------------------------------------------
-Rev. ID    : 023
-Rev. Date  : 19.02.2026
-Rev. Time  : 19:58:58
-Rev. Prompt: E-posta entegrasyonu — SMTP ayarları, bildirimler, gönderim geçmişi
-
-Rev. Report: (
-  Sisteme tam e-posta gönderim altyapısı eklendi. Admin ayarlar sayfasında
-  SMTP yapılandırması, 3 farklı bildirim türü ve gönderim geçmişi izleme.
-
-  BACKEND — YENİ BAĞIMLILIK:
-  - nodemailer + @types/nodemailer kuruldu
-
-  BACKEND — YENİ ENTITY (EmailLog):
-  - email_logs tablosu: id, type, recipients, subject, status, error_message, created_at
-  - type: 'absence_warning' | 'hr_daily_report' | 'system_error' | 'test'
-
-  BACKEND — SystemSettings ENTITY GENİŞLETME:
-  - 14 yeni kolon eklendi: SMTP ayarları (host, port, security, username, password,
-    from_address, from_name), email_enabled ana toggle, 3 bildirim türü için
-    enabled/recipients/time alanları
-
-  BACKEND — YENİ MODÜL (EmailModule):
-  - email.module.ts: Module tanımı, entity importları
-  - email.service.ts: SMTP transport, zamanlanmış görevler (@Interval 60sn),
-    devamsızlık uyarısı (kart basmayanlara), İK günlük raporu (özet tablo),
-    sistem hatası bildirimi (cihaz başına 30dk throttle), test e-postası,
-    çift gönderim koruması (in-memory + DB), tatil/hafta sonu kontrolü
-  - email.controller.ts: test-connection, send-test, logs endpoint'leri
-
-  BACKEND — MEVCUT DOSYA DEĞİŞİKLİKLERİ:
-  - entities/index.ts: EmailLog export eklendi
-  - app.module.ts: EmailLog entity + EmailModule import
-  - settings.service.ts: smtpPassword maskeleme ('********'), email alanları tip genişletme
-  - settings.controller.ts: body tipine email alanları eklendi
-  - sync.service.ts: EmailService inject, sync hatalarında sendSystemErrorNotification()
-  - device-comm.module.ts: EmailModule import
-
-  FRONTEND — AYARLAR SAYFASI:
-  - E-posta Ayarları kartı eklendi (Ayarları Kaydet ile Tatil Günleri arasında)
-  - Ana toggle: E-posta Bildirimlerini Etkinleştir
-  - SMTP Yapılandırması: sunucu, port (25/465/587), güvenlik (Yok/TLS/SSL),
-    kullanıcı adı, şifre, gönderen adresi, gönderen adı
-  - Bağlantı Testi ve Test E-postası Gönder butonları + sonuç gösterimi
-  - Bildirim Türleri: Devamsızlık Uyarısı (toggle+saat+alıcılar),
-    İK Günlük Rapor (toggle+saat+alıcılar), Sistem Hatası (toggle+alıcılar)
-  - E-posta Gönderim Geçmişi tablosu (tarih, tür, alıcı, konu, durum)
-
-  Yeni dosyalar: 3 (email-log.entity.ts, email.module.ts, email.service.ts, email.controller.ts)
-  Değişen backend: 6 (system-settings.entity.ts, entities/index.ts, app.module.ts,
-    settings.service.ts, settings.controller.ts, sync.service.ts, device-comm.module.ts)
+  Değişen backend: 7 (system-settings.entity.ts, email-log.entity.ts,
+    email.module.ts, email.service.ts, email.controller.ts,
+    settings.service.ts, settings.controller.ts)
   Değişen frontend: 1 (Settings/index.tsx)
+)
+---------------------------------------------------------
+Rev. ID    : 030
+Rev. Date  : 26.02.2026
+Rev. Time  : 18:35:19
+Rev. Prompt: Operatör paneli yeniden tasarım — iki sekmeli form + route kısıtlaması
+
+Rev. Report: (
+  Operatör paneli tamamen yeniden tasarlandı. Modal yerine iki sekmeli inline
+  form yapısına geçildi. Operatör kullanıcıları artık sadece operatör paneline
+  erişebiliyor (diğer sayfalar kısıtlı).
+
+  BACKEND — TempCardAssignment Entity:
+  - 4 yeni kolon: document_type (kimlik/ehliyet/pasaport), shelf_no,
+    visited_personnel_id (FK→Personnel), visit_reason
+  - visitedPersonnel ManyToOne relation eklendi
+
+  BACKEND — IssueTempCardDto:
+  - 5 yeni alan: guestPhone, documentType, shelfNo, visitedPersonnelId, visitReason
+
+  BACKEND — OperatorPanelService:
+  - issueTempCard: guestPhone desteği, yeni alanlar assignment kaydına dahil
+  - getActiveAssignments: visitedPersonnel relation join eklendi
+  - getHistory: visitedPersonnel relation eklendi
+
+  FRONTEND — App.tsx (Route Kısıtlaması):
+  - OperatorRedirect bileşeni eklendi: operator rolündeki kullanıcıları
+    /operator-panel'e yönlendiriyor
+  - Tüm non-operator route'lar OperatorRedirect ile sarmalandı
+  - Operatör artık dashboard, personel, cihazlar, raporlar vb. sayfalara erişemiyor
+
+  FRONTEND — Sidebar.tsx:
+  - Operatör rolü sadece "Operatör Paneli" navigasyon öğesini görüyor
+  - Admin/viewer rolleri ise tüm menü yapısını görmeye devam ediyor
+
+  FRONTEND — OperatorPanel/index.tsx (Tam Yeniden Yazım):
+  - Modal tabanlı tasarım → inline iki sekmeli form tasarımına geçildi
+  - Ana görünüm: "Geçici Kart Ver" formu + "Geçmiş" arasında geçiş
+  - Form sekmeleri:
+    · "Misafir Geçici Kart": ad, soyad, telefon, kimlik türü dropdown
+      (kimlik/ehliyet/pasaport), raf no, ziyaret edilen personel (aranabilir),
+      ziyaret nedeni (textarea)
+    · "Personel Geçici Kart": personel arama (typeahead) + sağ tarafta
+      fotoğraf önizleme
+  - Ortak alanlar: bitiş zamanı (9:00/12:00/15:00/18:00 dropdown, varsayılan
+    18:00), kart no, cihaz seçimi (lokasyon bazlı gruplu)
+  - Aktif kartlar tablosu formun altında gösteriliyor
+  - Geçmiş görünümü sayfalı tablo
+  - PersonnelSearchField: yeniden kullanılabilir arama bileşeni (debounce)
+
+  FRONTEND — types/index.ts:
+  - TempCardAssignment: documentType, shelfNo, visitedPersonnelId,
+    visitedPersonnel, visitReason alanları eklendi
+
+  Değişen backend: 3 (temp-card-assignment.entity.ts, issue-temp-card.dto.ts,
+    operator-panel.service.ts)
+  Değişen frontend: 4 (App.tsx, Sidebar.tsx, OperatorPanel/index.tsx, types/index.ts)
+)
+---------------------------------------------------------
+Rev. ID    : 031
+Rev. Date  : 26.02.2026
+Rev. Time  : 18:51:25
+Rev. Prompt: Operatör paneli — kart geri verme + geçiş kayıtları sekmeleri
+
+Rev. Report: (
+  Operatör paneline iki yeni sekme eklendi: "Kart Geri Verme" ve "Geçiş Kayıtları".
+  Toplam 4 sekme: Misafir Geçici Kart, Personel Geçici Kart, Kart Geri Verme,
+  Geçiş Kayıtları. Backend değişikliği gerekmedi — mevcut endpoint'ler yeterli.
+
+  FRONTEND — OperatorPanel/index.tsx (Yeniden Yapılandırma):
+  - 2 sekmeli yapı → 4 sekmeli yapıya geçildi
+  - view state: 'form' | 'history' → 'guest' | 'personnel' | 'return' | 'access-logs'
+  - formTab state kaldırıldı (guest/personnel artık doğrudan üst seviye sekme)
+  - Üst bar: 4 sekme butonu (ikon + etiket), lokasyon bilgisi gösterimi
+  - Bileşen ayrımı: FormSection, ReturnSection, AccessLogsSection alt bileşenlere bölündü
+
+  SEKME 3 — Kart Geri Verme (ReturnSection):
+  - Alt sekmeler: "Aktif Kartlar" + "Geçmiş"
+  - Aktif kartlar: mevcut tablonun form altından buraya taşınması
+  - Her satırda "Geri Al" butonu (revoke işlemi)
+  - fetchActive() artık locationId parametresi gönderiyor (operatörün lokasyonu)
+  - Geçmiş: sayfalı tablo (mevcut history view'ın taşınması)
+  - Boş durum gösterimi (CreditCard ikonu + mesaj)
+
+  SEKME 4 — Geçiş Kayıtları (AccessLogsSection):
+  - Operatörün varsayılan lokasyonundaki giriş/çıkış kayıtları
+  - Lokasyon atanmamışsa bilgi mesajı (AlertCircle)
+  - Filtreler: tarih (bugün varsayılan), personel arama (Enter veya Ara butonu)
+  - Tablo: Personel (ad + departman), Cihaz, Zaman, Yön (Giriş/Çıkış badge)
+  - Sayfalama (50/sayfa)
+  - 30 saniyede bir auto-refresh
+  - Manuel yenile butonu (RefreshCw ikonu, yüklenirken animasyon)
+  - Mevcut GET /access-logs?locationId=...&startDate=...&endDate=... endpoint'i kullanılıyor
+
+  Değişen dosyalar: 1 (OperatorPanel/index.tsx)
+)
+---------------------------------------------------------
+Rev. ID    : 032
+Rev. Date  : 26.02.2026
+Rev. Time  : 19:02:33
+Rev. Prompt: Geçici kart otomatik revoke — 1 saat grace period
+
+Rev. Report: (
+  Geçici kartların otomatik temizleme zamanlaması değiştirildi. Önceden kart
+  süre dolduğu anda (~60sn içinde) cihazlardan siliniyordu. Artık süre
+  dolduktan 1 saat sonra silinecek (grace period).
+
+  BACKEND — OperatorPanelService.cleanupExpired():
+  - LessThan(new Date()) → LessThan(new Date(Date.now() - 1h))
+  - graceMs = 60 * 60 * 1000 (1 saat)
+  - Örnek: expiresAt=18:00 → cihazdan silme 19:00'da gerçekleşir
+
+  Değişen dosyalar: 1 (operator-panel.service.ts)
+)
+---------------------------------------------------------
+Rev. ID    : 033
+Rev. Date  : 26.02.2026
+Rev. Time  : 19:22:46
+Rev. Prompt: Operatör paneli fotoğraf boyutu 1.5x büyütme
+
+Rev. Report: (
+  Operatör panelindeki personel fotoğrafları 1.5x büyütüldü.
+
+  FRONTEND — OperatorPanel/index.tsx:
+  - Personel sekmesi fotoğraf kutusu: w-24 h-28 → w-36 h-[168px] (96×112 → 144×168px)
+  - Kamera placeholder ikonu: w-8 h-8 → w-12 h-12
+  - İsim etiketi max genişlik: max-w-24 → max-w-36
+  - Arama dropdown avatar: w-7 h-7 → w-10 h-10 (28→40px), font text-xs → text-sm
+
+  Değişen dosyalar: 1 (OperatorPanel/index.tsx)
 )
 ---------------------------------------------------------

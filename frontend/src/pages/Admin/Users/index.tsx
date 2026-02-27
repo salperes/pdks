@@ -8,7 +8,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { api } from '../../../services/api';
-import type { User } from '../../../types';
+import type { User, Location } from '../../../types';
 
 /* ---------- Types ---------- */
 
@@ -18,6 +18,7 @@ interface UserForm {
   fullName: string;
   email: string;
   role: 'admin' | 'operator' | 'viewer';
+  defaultLocationId: string;
 }
 
 interface Toast {
@@ -32,6 +33,7 @@ const emptyForm: UserForm = {
   fullName: '',
   email: '',
   role: 'viewer',
+  defaultLocationId: '',
 };
 
 const roleLabels: Record<string, string> = {
@@ -53,6 +55,7 @@ let toastCounter = 0;
 export const UsersPage = () => {
   /* ---- Data state ---- */
   const [users, setUsers] = useState<User[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(false);
 
   /* ---- Modal state ---- */
@@ -94,6 +97,10 @@ export const UsersPage = () => {
 
   useEffect(() => {
     fetchUsers();
+    api.get<Location[]>('/locations').then((res) => {
+      const list = Array.isArray(res.data) ? res.data : (res.data as any).data || [];
+      setLocations(list);
+    }).catch(() => { /* ignore */ });
   }, [fetchUsers]);
 
   /* ---------- Modal open helpers ---------- */
@@ -112,6 +119,7 @@ export const UsersPage = () => {
       fullName: u.fullName,
       email: u.email ?? '',
       role: u.role,
+      defaultLocationId: u.defaultLocationId ?? '',
     });
     setModalOpen(true);
   };
@@ -142,23 +150,25 @@ export const UsersPage = () => {
 
     try {
       if (editingId) {
-        const payload: Record<string, string> = {
+        const payload: Record<string, string | null> = {
           username: form.username.trim(),
           fullName: form.fullName.trim(),
           role: form.role,
         };
         if (form.email.trim()) payload.email = form.email.trim();
         if (form.password) payload.password = form.password;
+        payload.defaultLocationId = form.defaultLocationId || null;
         await api.patch(`/users/${editingId}`, payload);
         showToast('Kullanıcı başarıyla güncellendi.', 'success');
       } else {
-        const payload: Record<string, string> = {
+        const payload: Record<string, string | null> = {
           username: form.username.trim(),
           password: form.password,
           fullName: form.fullName.trim(),
           role: form.role,
         };
         if (form.email.trim()) payload.email = form.email.trim();
+        payload.defaultLocationId = form.defaultLocationId || null;
         await api.post('/users', payload);
         showToast('Kullanıcı başarıyla eklendi.', 'success');
       }
@@ -436,6 +446,30 @@ export const UsersPage = () => {
                   <option value="viewer">İzleyici</option>
                 </select>
               </div>
+
+              {/* Default Location (for operator role) */}
+              {(form.role === 'operator' || form.role === 'admin') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Varsayılan Lokasyon
+                  </label>
+                  <select
+                    value={form.defaultLocationId}
+                    onChange={(e) => updateField('defaultLocationId', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0078d4] focus:border-transparent"
+                  >
+                    <option value="">Seçilmedi</option>
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Operatör panelinde bu lokasyondaki cihazlar öncelikli gösterilir
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Footer */}

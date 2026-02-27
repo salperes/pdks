@@ -41,11 +41,11 @@ export class SettingsService {
       });
       await this.settingsRepo.save(row);
     }
-    // API yanıtında SMTP şifresini maskele
-    if (row.smtpPassword) {
-      row = { ...row, smtpPassword: '********' };
-    }
-    return row;
+    // API yanıtında hassas alanları maskele
+    const masked = { ...row };
+    if (masked.smtpPassword) masked.smtpPassword = '********';
+    if (masked.msgServiceApiKey) masked.msgServiceApiKey = '********';
+    return masked;
   }
 
   async updateSettings(
@@ -57,24 +57,31 @@ export class SettingsService {
         | 'smtpHost' | 'smtpPort' | 'smtpSecurity' | 'smtpUsername' | 'smtpPassword'
         | 'smtpFromAddress' | 'smtpFromName' | 'emailEnabled'
         | 'notifyAbsenceEnabled' | 'notifyAbsenceRecipients' | 'notifyAbsenceTime'
+        | 'notifyAbsenceEmailEnabled' | 'notifyAbsenceWaEnabled' | 'notifyAbsenceWaRecipients'
         | 'notifyHrEnabled' | 'notifyHrRecipients' | 'notifyHrTime'
+        | 'notifyHrEmailEnabled' | 'notifyHrWaEnabled' | 'notifyHrWaRecipients'
         | 'notifySystemErrorEnabled' | 'notifySystemErrorRecipients'
+        | 'notifySystemErrorEmailEnabled' | 'notifySystemErrorWaEnabled' | 'notifySystemErrorWaRecipients'
+        | 'msgServiceUrl' | 'msgServiceApiKey' | 'msgServiceEnabled'
       >
     >,
   ): Promise<SystemSettings> {
-    // Maskelenmiş şifreyi geri yazmayı önle
+    // Maskelenmiş değerleri geri yazmayı önle
     const raw = await this.settingsRepo.findOneBy({ id: 'default' });
     if (data.smtpPassword === '********') {
       delete data.smtpPassword;
     }
+    if (data.msgServiceApiKey === '********') {
+      delete data.msgServiceApiKey;
+    }
     const row = raw ?? (await this.getSettings());
     Object.assign(row, data);
     const saved = await this.settingsRepo.save(row);
-    // Yanıtta şifreyi maskele
-    if (saved.smtpPassword) {
-      return { ...saved, smtpPassword: '********' };
-    }
-    return saved;
+    // Yanıtta hassas alanları maskele
+    const masked = { ...saved };
+    if (masked.smtpPassword) masked.smtpPassword = '********';
+    if (masked.msgServiceApiKey) masked.msgServiceApiKey = '********';
+    return masked;
   }
 
   /* ── Work Config ────────────────────────── */
