@@ -66,6 +66,7 @@ export class SettingsController {
       notifyHrEmailEnabled?: boolean;
       notifyHrWaEnabled?: boolean;
       notifyHrWaRecipients?: string[];
+      deviceOfflineThreshold?: number;
       notifySystemErrorEnabled?: boolean;
       notifySystemErrorRecipients?: string[];
       notifySystemErrorEmailEnabled?: boolean;

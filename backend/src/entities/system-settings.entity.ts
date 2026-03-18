@@ -92,6 +92,9 @@ export class SystemSettings {
   @Column({ type: 'simple-array', nullable: true, name: 'notify_hr_wa_recipients' })
   notifyHrWaRecipients: string[] | null;
 
+  @Column({ type: 'int', default: 4, name: 'device_offline_threshold' })
+  deviceOfflineThreshold: number;
+
   @Column({ type: 'boolean', default: false, name: 'notify_system_error_enabled' })
   notifySystemErrorEnabled: boolean;
 

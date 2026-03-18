@@ -230,3 +230,42 @@ Rev. Report: (
   Değişen dosyalar: 2 (services/api.ts, pages/Login/index.tsx)
 )
 ---------------------------------------------------------
+Rev. ID    : 035
+Rev. Date  : 18.03.2026
+Rev. Time  : 11:00:00
+Rev. Prompt: Sistem hatası bildirimi — ardışık hata eşiği (varsayılan 4 senkronizasyon, ayarlanabilir)
+
+Rev. Report: (
+  Cihaz senkronizasyon hatası bildirimi için ardışık hata eşiği eklendi.
+  Önceden her senkronizasyon hatasında anlık bildirim gönderiliyordu.
+  Artık belirlenen eşiğe ulaşılınca bildirim gönderiliyor (varsayılan: 4).
+  WAN üzerindeki cihazların geçici erişim kesintilerinde gereksiz
+  bildirim oluşturması önlendi.
+
+  BACKEND — SystemSettings Entity:
+  - deviceOfflineThreshold: int, default 4 (device_offline_threshold kolonu)
+
+  BACKEND — DeviceCommModule:
+  - SystemSettings entity TypeORM forFeature'a eklendi
+
+  BACKEND — SyncService:
+  - failureCount: Map<string, number> — cihaz başına ardışık hata sayacı
+  - settingsRepository enjekte edildi (threshold okunur)
+  - Ping başarısız: failureCount artırılır; count === threshold olunca bildirim
+  - Sync başarısız: failureCount artırılır; count === threshold olunca bildirim
+  - Sync başarılı: failureCount sıfırlanır
+
+  BACKEND — SettingsController:
+  - PATCH /settings body tipine deviceOfflineThreshold?: number eklendi
+
+  FRONTEND — Settings/index.tsx:
+  - NotificationSettings interface'e deviceOfflineThreshold: number eklendi
+  - Default state: 4, loadSettings'de DB'den okunuyor
+  - handleSaveNotifSettings: deviceOfflineThreshold gönderiliyor
+  - Sistem Hatası kartına "Ardışık hata eşiği" number input eklendi (1-20 arası)
+
+  Değişen backend: 3 (system-settings.entity.ts, device-comm.module.ts, sync.service.ts,
+    settings.controller.ts)
+  Değişen frontend: 1 (Settings/index.tsx)
+)
+---------------------------------------------------------

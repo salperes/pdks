@@ -96,6 +96,7 @@ interface NotificationSettings {
   notifyHrRecipients: string;
   notifyHrWaEnabled: boolean;
   notifyHrWaRecipients: string;
+  deviceOfflineThreshold: number;
   notifySystemErrorEnabled: boolean;
   notifySystemErrorEmailEnabled: boolean;
   notifySystemErrorRecipients: string;
@@ -185,6 +186,7 @@ export const SettingsPage = () => {
     notifyHrEnabled: false, notifyHrTime: '18:30',
     notifyHrEmailEnabled: true, notifyHrRecipients: '',
     notifyHrWaEnabled: false, notifyHrWaRecipients: '',
+    deviceOfflineThreshold: 4,
     notifySystemErrorEnabled: false,
     notifySystemErrorEmailEnabled: true, notifySystemErrorRecipients: '',
     notifySystemErrorWaEnabled: false, notifySystemErrorWaRecipients: '',
@@ -285,6 +287,7 @@ export const SettingsPage = () => {
         notifyHrRecipients: arr2str(d.notifyHrRecipients),
         notifyHrWaEnabled: d.notifyHrWaEnabled ?? false,
         notifyHrWaRecipients: arr2str(d.notifyHrWaRecipients),
+        deviceOfflineThreshold: d.deviceOfflineThreshold ?? 4,
         notifySystemErrorEnabled: d.notifySystemErrorEnabled ?? false,
         notifySystemErrorEmailEnabled: d.notifySystemErrorEmailEnabled ?? true,
         notifySystemErrorRecipients: arr2str(d.notifySystemErrorRecipients),
@@ -407,6 +410,7 @@ export const SettingsPage = () => {
         notifyHrRecipients: parseRecipients(notifSettings.notifyHrRecipients),
         notifyHrWaEnabled: notifSettings.notifyHrWaEnabled,
         notifyHrWaRecipients: parseRecipients(notifSettings.notifyHrWaRecipients),
+        deviceOfflineThreshold: notifSettings.deviceOfflineThreshold,
         notifySystemErrorEnabled: notifSettings.notifySystemErrorEnabled,
         notifySystemErrorEmailEnabled: notifSettings.notifySystemErrorEmailEnabled,
         notifySystemErrorRecipients: parseRecipients(notifSettings.notifySystemErrorRecipients),
@@ -859,7 +863,17 @@ export const SettingsPage = () => {
                       {notifSettings.notifySystemErrorEnabled ? <ToggleRight className="w-7 h-7" /> : <ToggleLeft className="w-7 h-7 text-gray-400" />}
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Cihaz bağlantı kopması veya senkronizasyon hatası olduğunda anlık bildirim gönderir</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Cihaz bağlantı kopması veya senkronizasyon hatası olduğunda bildirim gönderir</p>
+                  <div className="flex items-center gap-3">
+                    <label className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">Ardışık hata eşiği:</label>
+                    <input
+                      type="number" min={1} max={20}
+                      value={notifSettings.deviceOfflineThreshold}
+                      onChange={(e) => setNotifSettings((s) => ({ ...s, deviceOfflineThreshold: Math.max(1, parseInt(e.target.value) || 1) }))}
+                      className={`${inputClass} w-20`}
+                    />
+                    <span className="text-xs text-gray-500 dark:text-gray-400">senkronizasyon</span>
+                  </div>
                   <div className="flex items-start gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                     <button onClick={() => setNotifSettings((s) => ({ ...s, notifySystemErrorEmailEnabled: !s.notifySystemErrorEmailEnabled }))} className="mt-0.5">
                       {notifSettings.notifySystemErrorEmailEnabled ? <ToggleRight className="w-6 h-6 text-[#0078d4]" /> : <ToggleLeft className="w-6 h-6 text-gray-400" />}

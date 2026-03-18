@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Interval } from '@nestjs/schedule';
 import { exec } from 'child_process';
-import { Device, AccessLog, Personnel, SyncHistory } from '../entities';
+import { Device, AccessLog, Personnel, SyncHistory, SystemSettings } from '../entities';
 import { ZktecoClientService } from './zkteco-client.service';
 import { EmailService } from '../email/email.service';
 
@@ -16,6 +16,8 @@ const TURKEY_OFFSET_MS = 3 * 60 * 60 * 1000;
 export class SyncService {
   private readonly logger = new Logger(SyncService.name);
   private isSyncing = false;
+  // Tracks consecutive unreachable/failed sync cycles per device (by device id)
+  private readonly failureCount = new Map<string, number>();
 
   constructor(
     @InjectRepository(Device)
@@ -26,6 +28,8 @@ export class SyncService {
     private readonly personnelRepository: Repository<Personnel>,
     @InjectRepository(SyncHistory)
     private readonly syncHistoryRepository: Repository<SyncHistory>,
+    @InjectRepository(SystemSettings)
+    private readonly settingsRepository: Repository<SystemSettings>,
     private readonly zktecoClient: ZktecoClientService,
     private readonly emailService: EmailService,
   ) {}
@@ -40,6 +44,9 @@ export class SyncService {
     this.isSyncing = true;
 
     try {
+      const settings = await this.settingsRepository.findOne({ where: { id: 'default' } });
+      const offlineThreshold = settings?.deviceOfflineThreshold ?? 4;
+
       const devices = await this.deviceRepository.find({
         where: { isActive: true },
       });
@@ -66,9 +73,18 @@ export class SyncService {
         this.logger.debug(
           `Ping failed (skipping): ${dead.map((d) => d.name).join(', ')}`,
         );
-        // Mark unreachable devices as offline
         for (const d of dead) {
           await this.deviceRepository.update(d.id, { isOnline: false }).catch(() => {});
+          const count = (this.failureCount.get(d.id) ?? 0) + 1;
+          this.failureCount.set(d.id, count);
+          if (count === offlineThreshold) {
+            this.emailService.sendSystemErrorNotification({
+              deviceName: d.name,
+              deviceId: d.id,
+              errorType: 'Cihaz Erişilemiyor',
+              message: `${offlineThreshold} ardışık senkronizasyonda ping yanıtı alınamadı.`,
+            }).catch(() => {});
+          }
         }
       }
 
@@ -87,14 +103,20 @@ export class SyncService {
               `${device.name}: synced ${result.recordsSynced} new record(s)`,
             );
           }
+          // Reset failure counter on successful sync
+          this.failureCount.set(device.id, 0);
         } catch (error) {
           this.logger.warn(`Failed to sync ${device.name} (${device.ipAddress}): ${error?.message}`);
-          this.emailService.sendSystemErrorNotification({
-            deviceName: device.name,
-            deviceId: device.id,
-            errorType: 'Cihaz Senkronizasyon Hatası',
-            message: error?.message ?? 'Bilinmeyen hata',
-          }).catch(() => {});
+          const count = (this.failureCount.get(device.id) ?? 0) + 1;
+          this.failureCount.set(device.id, count);
+          if (count === offlineThreshold) {
+            this.emailService.sendSystemErrorNotification({
+              deviceName: device.name,
+              deviceId: device.id,
+              errorType: 'Cihaz Senkronizasyon Hatası',
+              message: `${offlineThreshold} ardışık senkronizasyon başarısız: ${error?.message ?? 'Bilinmeyen hata'}`,
+            }).catch(() => {});
+          }
         }
       }
     } finally {
