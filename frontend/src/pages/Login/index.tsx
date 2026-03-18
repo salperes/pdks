@@ -14,7 +14,7 @@ export const LoginPage = () => {
 
   // SSO token yakalama — Portal'dan gelen sso_token parametresini işle
   useEffect(() => {
-    if (ssoAttempted.current || isAuthenticated) return;
+    if (ssoAttempted.current) return;
     const params = new URLSearchParams(window.location.search);
     const ssoToken = params.get('sso_token');
     if (!ssoToken) return;
@@ -39,7 +39,9 @@ export const LoginPage = () => {
       .finally(() => setSsoLoading(false));
   }, [isAuthenticated]);
 
-  if (isAuthenticated) return <Navigate to="/" replace />;
+  // SSO token varsa önce onu işle (stale isAuthenticated'ı atla)
+  const hasSsoToken = new URLSearchParams(window.location.search).get('sso_token');
+  if (isAuthenticated && !hasSsoToken) return <Navigate to="/" replace />;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();

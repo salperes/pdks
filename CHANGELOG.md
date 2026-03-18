@@ -200,3 +200,33 @@ Rev. Report: (
   Değişen dosyalar: 1 (OperatorPanel/index.tsx)
 )
 ---------------------------------------------------------
+Rev. ID    : 034
+Rev. Date  : 18.03.2026
+Rev. Time  : 10:15:00
+Rev. Prompt: SSO session timeout — browser kapatılıp yeniden bağlanınca sonsuz refresh döngüsü düzeltmesi
+
+Rev. Report: (
+  Browser kapatılıp token süresi dolduktan sonra SSO ile yeniden bağlanmaya
+  çalışıldığında sayfa sürekli refresh yapıyordu. Stale Zustand persist verisi
+  ile süresi dolmuş token kombinasyonu sonsuz döngüye neden oluyordu.
+
+  KÖK NEDEN:
+  - Zustand persist ('pdks-auth') localStorage'da isAuthenticated:true tutuyordu
+  - api.ts interceptor refresh token başarısız olunca sadece accessToken/refreshToken
+    siliyor, pdks-auth persist verisini silmiyordu
+  - /login sayfasına yönlendirilince isAuthenticated:true görülüyor → Navigate to /
+  - / → API 401 → refresh fail → /login → isAuthenticated:true → / → sonsuz döngü
+  - SSO effect'te isAuthenticated guard URL'deki sso_token'ı da engelliyordu
+
+  FRONTEND — services/api.ts:
+  - Refresh fail catch bloğu: localStorage.removeItem('pdks-auth') eklendi
+    (Zustand persist temizlenerek döngü kırılıyor)
+
+  FRONTEND — pages/Login/index.tsx:
+  - SSO useEffect guard: || isAuthenticated kaldırıldı (ssoAttempted.current yeterli)
+  - Navigate to / guard: sso_token varsa atlanıyor (hasSsoToken kontrolü eklendi)
+    Böylece stale isAuthenticated olsa bile gelen SSO token işleniyor
+
+  Değişen dosyalar: 2 (services/api.ts, pages/Login/index.tsx)
+)
+---------------------------------------------------------

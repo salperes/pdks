@@ -36,6 +36,7 @@ api.interceptors.response.use(
       } catch {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
+        localStorage.removeItem('pdks-auth'); // Zustand persist temizle — sonsuz döngüyü kır
         window.location.href = '/login';
         return Promise.reject(error);
       }
