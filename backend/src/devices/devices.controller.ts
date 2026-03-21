@@ -237,7 +237,7 @@ export class DevicesController {
     }
 
     const name = `${personnel.firstName} ${personnel.lastName}`.substring(0, 24);
-    const cardno = parseInt(personnel.cardNumber, 10) || 0;
+    const cardno = parseInt(personnel.cardNumber ?? '0', 10) || 0;
     const userId = personnel.employeeId ? String(personnel.employeeId) : String(uid);
 
     let zk: any;
@@ -309,7 +309,7 @@ export class DevicesController {
         try {
           const uid = this.resolveUid(personnel);
           const name = `${personnel.firstName} ${personnel.lastName}`.substring(0, 24);
-          const cardno = parseInt(personnel.cardNumber, 10) || 0;
+          const cardno = parseInt(personnel.cardNumber ?? '0', 10) || 0;
           const userId = personnel.employeeId ? String(personnel.employeeId) : String(uid);
           await this.zktecoClient.setUser(zk, uid, name, cardno, userId);
           results.push({ personnelId: personnel.id, uid, success: true });

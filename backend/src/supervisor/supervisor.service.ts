@@ -128,7 +128,7 @@ export class SupervisorService {
 
     const uid = this.resolveUid(personnel);
     const name = `${personnel.firstName} ${personnel.lastName}`.substring(0, 24);
-    const cardno = parseInt(personnel.cardNumber, 10) || 0;
+    const cardno = parseInt(personnel.cardNumber ?? '0', 10) || 0;
     const userIdOnDevice = personnel.employeeId ? String(personnel.employeeId) : String(uid);
 
     const results: AssignmentResult[] = [];
@@ -353,7 +353,7 @@ export class SupervisorService {
           id: p.id,
           uid,
           name: `${p.firstName} ${p.lastName}`.substring(0, 24),
-          cardno: parseInt(p.cardNumber, 10) || 0,
+          cardno: parseInt(p.cardNumber ?? '0', 10) || 0,
           userId: p.employeeId ? String(p.employeeId) : String(uid),
         });
       } catch (error) {
