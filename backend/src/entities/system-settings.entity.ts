@@ -121,6 +121,23 @@ export class SystemSettings {
   @Column({ type: 'boolean', default: false, name: 'msg_service_enabled' })
   msgServiceEnabled: boolean;
 
+  /* ── Portal Entegrasyonu ─────────────────── */
+
+  @Column({ type: 'varchar', length: 500, nullable: true, name: 'portal_api_url' })
+  portalApiUrl: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true, name: 'portal_api_key' })
+  portalApiKey: string | null;
+
+  @Column({ type: 'boolean', default: false, name: 'portal_sync_enabled' })
+  portalSyncEnabled: boolean;
+
+  @Column({ type: 'timestamptz', nullable: true, name: 'portal_last_sync' })
+  portalLastSync: Date | null;
+
+  @Column({ type: 'int', nullable: true, name: 'portal_last_sync_count' })
+  portalLastSyncCount: number | null;
+
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }

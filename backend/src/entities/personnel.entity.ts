@@ -29,8 +29,8 @@ export class Personnel {
   username: string;
 
   @Index()
-  @Column({ type: 'varchar', length: 50, unique: true, name: 'card_number' })
-  cardNumber: string;
+  @Column({ type: 'varchar', length: 50, unique: true, nullable: true, name: 'card_number' })
+  cardNumber: string | null;
 
   @Index()
   @Column({ type: 'varchar', length: 100, nullable: true })

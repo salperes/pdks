@@ -269,3 +269,58 @@ Rev. Report: (
   Değişen frontend: 1 (Settings/index.tsx)
 )
 ---------------------------------------------------------
+Rev. ID    : 036
+Rev. Date  : 21.03.2026
+Rev. Time  : --:--:--
+Rev. Prompt: MSS Personeli — Portal senkronizasyon modülü (günde 4 kez otomatik, Admin ayarlardan yapılandırma)
+
+Rev. Report: (
+  Portal uygulamasının GET /api/users/sync endpoint'inden MSS personelini
+  günde 4 kez (00:00 / 06:00 / 12:00 / 18:00) çekip PDKS'e aktaran modül eklendi.
+  Admin > Ayarlar sayfasından Portal URL, API Key girilip bağlantı testi yapılabiliyor;
+  manuel senkronizasyon da tetiklenebiliyor.
+
+  BACKEND — Personnel Entity:
+  - cardNumber: nullable:true eklendi (Portal'dan gelen personelin kartı olmayabilir)
+
+  BACKEND — SystemSettings Entity:
+  - 5 yeni kolon: portal_api_url, portal_api_key, portal_sync_enabled,
+    portal_last_sync, portal_last_sync_count
+
+  BACKEND — Yeni Modül: portal-sync/
+  - portal-sync.service.ts:
+    · testConnection(): Portal URL + API Key ile erişim testi, kullanıcı sayısı döner
+    · syncNow(): GET {portalApiUrl}/api/users/sync → username (adUsername) ile eşleşme
+      Var: firstName/lastName/email/department/title/phone/isActive güncellenir
+      Yok: yeni Personnel oluşturulur (cardNumber=null)
+      Son sync zamanı ve kayıt sayısı settings'e kaydedilir
+    · @Cron('0 0,6,12,18 * * *'): günde 4 kez zamanlanmış senkronizasyon
+  - portal-sync.controller.ts:
+    · GET  /api/v1/portal-sync/status — son sync bilgisi
+    · POST /api/v1/portal-sync/test   — bağlantı testi
+    · POST /api/v1/portal-sync/sync   — manuel senkronizasyon
+  - portal-sync.module.ts
+
+  BACKEND — AppModule:
+  - PortalSyncModule import eklendi
+
+  BACKEND — SettingsService:
+  - portalApiKey maskeleme eklendi (getSettings + updateSettings)
+  - updateSettings Pick tipine portal alanları eklendi
+
+  FRONTEND — Settings/index.tsx:
+  - Globe import eklendi
+  - Portal state: portalSettings, portalStatus, loading/saving state'leri
+  - fetchPortalSettings(): /settings + /portal-sync/status paralel çekim
+  - handleSavePortalSettings(), handlePortalTest(), handlePortalSync()
+  - "Portal Entegrasyonu" kartı eklendi:
+    · MSS Personeli Senkronizasyonu toggle
+    · Portal URL + API Key inputları
+    · Son senkronizasyon zamanı ve kayıt sayısı
+    · Kaydet / Bağlantı Testi / Şimdi Senkronize Et butonları
+
+  Değişen backend: 5 (personnel.entity.ts, system-settings.entity.ts,
+    settings.service.ts, app.module.ts + yeni portal-sync/ modülü)
+  Değişen frontend: 1 (Settings/index.tsx)
+)
+---------------------------------------------------------

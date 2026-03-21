@@ -45,6 +45,7 @@ export class SettingsService {
     const masked = { ...row };
     if (masked.smtpPassword) masked.smtpPassword = '********';
     if (masked.msgServiceApiKey) masked.msgServiceApiKey = '********';
+    if (masked.portalApiKey) masked.portalApiKey = '********';
     return masked;
   }
 
@@ -63,6 +64,7 @@ export class SettingsService {
         | 'notifySystemErrorEnabled' | 'notifySystemErrorRecipients'
         | 'notifySystemErrorEmailEnabled' | 'notifySystemErrorWaEnabled' | 'notifySystemErrorWaRecipients'
         | 'msgServiceUrl' | 'msgServiceApiKey' | 'msgServiceEnabled'
+        | 'portalApiUrl' | 'portalApiKey' | 'portalSyncEnabled'
       >
     >,
   ): Promise<SystemSettings> {
@@ -74,6 +76,9 @@ export class SettingsService {
     if (data.msgServiceApiKey === '********') {
       delete data.msgServiceApiKey;
     }
+    if ((data as any).portalApiKey === '********') {
+      delete (data as any).portalApiKey;
+    }
     const row = raw ?? (await this.getSettings());
     Object.assign(row, data);
     const saved = await this.settingsRepo.save(row);
@@ -81,6 +86,7 @@ export class SettingsService {
     const masked = { ...saved };
     if (masked.smtpPassword) masked.smtpPassword = '********';
     if (masked.msgServiceApiKey) masked.msgServiceApiKey = '********';
+    if (masked.portalApiKey) masked.portalApiKey = '********';
     return masked;
   }
 

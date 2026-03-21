@@ -22,6 +22,7 @@ import { WorkSchedulesModule } from './work-schedules/work-schedules.module';
 import { EmailModule } from './email/email.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { OperatorPanelModule } from './operator-panel/operator-panel.module';
+import { PortalSyncModule } from './portal-sync/portal-sync.module';
 import { User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettings, Holiday, AuditLog, BackupHistory, PersonnelDevice, WorkSchedule, EmailLog, TempCardAssignment } from './entities';
 
 @Module({
@@ -61,6 +62,7 @@ import { User, Personnel, Location, Device, AccessLog, SyncHistory, SystemSettin
     EmailModule,
     MessagingModule,
     OperatorPanelModule,
+    PortalSyncModule,
   ],
 })
 export class AppModule {}
