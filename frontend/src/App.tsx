@@ -10,7 +10,14 @@ import { LocationsPage } from './pages/Locations';
 import { AccessLogsPage } from './pages/AccessLogs';
 import { UsersPage } from './pages/Admin/Users';
 import { ReportsPage } from './pages/Reports';
-import { SettingsPage } from './pages/Settings';
+import {
+  SettingsGenelPage,
+  SettingsBildirimlerPage,
+  SettingsTatillerPage,
+  SettingsPortalPage,
+  SettingsSistemPage,
+} from './pages/Settings';
+import { DenetimGunluguPage } from './pages/DenetimGunlugu';
 import { SupervisorPage } from './pages/Supervisor';
 import { WorkSchedulesPage } from './pages/WorkSchedules';
 import { OperatorPanelPage } from './pages/OperatorPanel';
@@ -63,7 +70,13 @@ function App() {
             <Route path="locations" element={<OperatorRedirect><LocationsPage /></OperatorRedirect>} />
             <Route path="admin/users" element={<OperatorRedirect><UsersPage /></OperatorRedirect>} />
             <Route path="admin/work-schedules" element={<OperatorRedirect><WorkSchedulesPage /></OperatorRedirect>} />
-            <Route path="admin/settings" element={<OperatorRedirect><SettingsPage /></OperatorRedirect>} />
+            <Route path="admin/settings" element={<Navigate to="/admin/settings/genel" replace />} />
+            <Route path="admin/settings/genel" element={<OperatorRedirect><SettingsGenelPage /></OperatorRedirect>} />
+            <Route path="admin/settings/bildirimler" element={<OperatorRedirect><SettingsBildirimlerPage /></OperatorRedirect>} />
+            <Route path="admin/settings/tatiller" element={<OperatorRedirect><SettingsTatillerPage /></OperatorRedirect>} />
+            <Route path="admin/settings/portal" element={<OperatorRedirect><SettingsPortalPage /></OperatorRedirect>} />
+            <Route path="admin/settings/sistem" element={<OperatorRedirect><SettingsSistemPage /></OperatorRedirect>} />
+            <Route path="admin/denetim-gunlugu" element={<OperatorRedirect><DenetimGunluguPage /></OperatorRedirect>} />
           </Route>
         </Routes>
       </BrowserRouter>

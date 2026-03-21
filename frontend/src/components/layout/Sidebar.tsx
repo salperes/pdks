@@ -11,6 +11,11 @@ import {
   Settings,
   LogOut,
   CreditCard,
+  Bell,
+  Calendar,
+  Globe,
+  Server,
+  FileText,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
@@ -19,6 +24,7 @@ interface NavItem {
   path: string;
   icon: LucideIcon;
   label: string;
+  children?: NavItem[];
 }
 
 const navItems: NavItem[] = [
@@ -38,7 +44,19 @@ const adminItems: NavItem[] = [
   { path: '/locations', icon: MapPin, label: 'Lokasyonlar' },
   { path: '/admin/work-schedules', icon: Clock, label: 'Mesai Programları' },
   { path: '/admin/users', icon: Users, label: 'Kullanıcılar' },
-  { path: '/admin/settings', icon: Settings, label: 'Ayarlar' },
+  { path: '/admin/denetim-gunlugu', icon: FileText, label: 'Denetim Günlüğü' },
+  {
+    path: '/admin/settings',
+    icon: Settings,
+    label: 'Ayarlar',
+    children: [
+      { path: '/admin/settings/genel', icon: Clock, label: 'Genel' },
+      { path: '/admin/settings/bildirimler', icon: Bell, label: 'Bildirimler' },
+      { path: '/admin/settings/tatiller', icon: Calendar, label: 'Tatil Günleri' },
+      { path: '/admin/settings/portal', icon: Globe, label: 'Portal' },
+      { path: '/admin/settings/sistem', icon: Server, label: 'Sistem & Yedek' },
+    ],
+  },
 ];
 
 interface SidebarProps {
@@ -51,8 +69,50 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const location = useLocation();
 
   const renderNavItem = (item: NavItem) => {
-    const isActive = location.pathname === item.path;
     const Icon = item.icon;
+
+    if (item.children) {
+      const isChildActive = item.children.some((child) =>
+        location.pathname.startsWith(child.path)
+      );
+      const isParentActive = location.pathname === item.path || isChildActive;
+
+      return (
+        <div key={item.path}>
+          <NavLink
+            to={item.children[0].path}
+            onClick={onClose}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+              isParentActive ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/10'
+            }`}
+          >
+            <Icon className="w-5 h-5" />
+            <span className="text-sm font-medium">{item.label}</span>
+          </NavLink>
+          <div className="ml-4 mt-1 space-y-1 pl-3 border-l border-white/20">
+            {item.children.map((child) => {
+              const ChildIcon = child.icon;
+              const isActive = location.pathname === child.path;
+              return (
+                <NavLink
+                  key={child.path}
+                  to={child.path}
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                    isActive ? 'bg-[#1890FF] text-white' : 'text-gray-300 hover:bg-white/10'
+                  }`}
+                >
+                  <ChildIcon className="w-4 h-4" />
+                  <span className="text-sm font-medium">{child.label}</span>
+                </NavLink>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    const isActive = location.pathname === item.path;
     return (
       <NavLink
         key={item.path}

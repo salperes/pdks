@@ -343,3 +343,32 @@ Rev. Report: (
   Degisen dosyalar: 1 (portal-sync.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 038
+Rev. Date  : 21.03.2026
+Rev. Time  : 15:30:00
+Rev. Prompt: Ayarlar sayfasi alt sayfalara bolundu, Denetim Gunlugu ayri menu
+
+Rev. Report: (
+  1567 satirlik tek Ayarlar sayfasi 5 alt sayfaya bolundu.
+  Sol menude Ayarlar collapsible parent yapildi.
+  Denetim Gunlugu ayri bir ust-duzey menu ogesi oldu.
+
+  FRONTEND — Yeni sayfalar:
+  - Settings/Genel.tsx      → /admin/settings/genel (Calisma Saatleri)
+  - Settings/Bildirimler.tsx → /admin/settings/bildirimler (Mesajlasma & Bildirimler)
+  - Settings/Tatiller.tsx   → /admin/settings/tatiller (Tatil Gunleri)
+  - Settings/Portal.tsx     → /admin/settings/portal (Portal Entegrasyonu)
+  - Settings/Sistem.tsx     → /admin/settings/sistem (Sistem Bilgisi & Yedekleme)
+  - Settings/styles.ts      → Paylasilan stil sabitleri
+  - DenetimGunlugu/index.tsx → /admin/denetim-gunlugu (Denetim Gunlugu - ayri parent)
+
+  FRONTEND — Degistirilen dosyalar:
+  - Settings/index.tsx → Re-export'a donusturuldu
+  - App.tsx → Yeni route'lar eklendi, /admin/settings redirect edildi
+  - Sidebar.tsx → NavItem children destegi, collapsible Ayarlar,
+    Denetim Gunlugu ayri menu ogesi
+
+  Degisen dosyalar: 3 (App.tsx, Sidebar.tsx, Settings/index.tsx)
+  Yeni dosyalar: 7
+)
+---------------------------------------------------------
