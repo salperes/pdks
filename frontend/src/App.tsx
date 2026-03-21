@@ -21,6 +21,7 @@ import { DenetimGunluguPage } from './pages/DenetimGunlugu';
 import { SupervisorPage } from './pages/Supervisor';
 import { WorkSchedulesPage } from './pages/WorkSchedules';
 import { OperatorPanelPage } from './pages/OperatorPanel';
+import { QueryPage } from './pages/Admin/Query';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -77,6 +78,7 @@ function App() {
             <Route path="admin/settings/portal" element={<OperatorRedirect><SettingsPortalPage /></OperatorRedirect>} />
             <Route path="admin/settings/sistem" element={<OperatorRedirect><SettingsSistemPage /></OperatorRedirect>} />
             <Route path="admin/denetim-gunlugu" element={<OperatorRedirect><DenetimGunluguPage /></OperatorRedirect>} />
+            <Route path="admin/query" element={<OperatorRedirect><QueryPage /></OperatorRedirect>} />
           </Route>
         </Routes>
       </BrowserRouter>

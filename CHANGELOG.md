@@ -111,3 +111,28 @@ Rev. Report: (
     frontend/Personnel/index.tsx)
 )
 ---------------------------------------------------------
+Rev. ID    : 042
+Rev. Date  : 21.03.2026
+Rev. Time  : 20:00:00
+Rev. Prompt: Detayli sorgu modulu - kisi adi / kart numarasi ile anlik sorgulama
+
+Rev. Report: (
+  Admin menusune Detayli Sorgu sayfasi (/admin/query) eklendi.
+  Iki sorgu modu: Kisi (ad/username/kart ile arama) ve Kart numarasi.
+
+  BACKEND - backend/src/query/ (yeni modul):
+  - query.service.ts: searchByPerson() + searchByCard(); window/GROUP BY ile N+1 yok
+  - query.controller.ts: GET /query/person?q= + GET /query/card?number=
+  - query.module.ts
+
+  BACKEND - app.module.ts: QueryModule eklendi
+
+  FRONTEND - pages/Admin/Query/index.tsx:
+  - Kisi/Kart sekmeleri, accordion PersonCard (son 5 log),
+    CardResultView (son 20 log), orphan log kutusu, ornek sorgu butonlari
+
+  FRONTEND - Sidebar.tsx + App.tsx: yeni route ve menu ogesi
+
+  Degisen/yeni dosyalar: 6
+)
+---------------------------------------------------------

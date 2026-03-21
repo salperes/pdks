@@ -16,6 +16,7 @@ import {
   Globe,
   Server,
   FileText,
+  SearchCode,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
@@ -45,6 +46,7 @@ const adminItems: NavItem[] = [
   { path: '/admin/work-schedules', icon: Clock, label: 'Mesai Programları' },
   { path: '/admin/users', icon: Users, label: 'Kullanıcılar' },
   { path: '/admin/denetim-gunlugu', icon: FileText, label: 'Denetim Günlüğü' },
+  { path: '/admin/query', icon: SearchCode, label: 'Detaylı Sorgu' },
   {
     path: '/admin/settings',
     icon: Settings,
