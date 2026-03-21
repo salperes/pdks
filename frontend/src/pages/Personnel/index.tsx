@@ -7,6 +7,8 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   UserPlus,
   Upload,
   BarChart3,
@@ -19,6 +21,7 @@ import {
   Calendar,
   Camera,
   ImageOff,
+  ChevronsUpDown,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
@@ -130,6 +133,10 @@ export const PersonnelPage = () => {
   /* ---- Filter state ---- */
   const [search, setSearch] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
+  const [sortBy, setSortBy] = useState('');
+  const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('DESC');
+  const [noCard, setNoCard] = useState(false);
+  const [duplicateCards, setDuplicateCards] = useState(false);
 
   /* ---- Modal state ---- */
   const [modalOpen, setModalOpen] = useState(false);
@@ -187,12 +194,23 @@ export const PersonnelPage = () => {
   /* ---------- Fetch ---------- */
 
   const fetchPersonnel = useCallback(
-    async (pg: number, searchVal: string, dept: string) => {
+    async (
+      pg: number,
+      searchVal: string,
+      dept: string,
+      sb: string,
+      sd: 'ASC' | 'DESC',
+      nc: boolean,
+      dc: boolean,
+    ) => {
       setLoading(true);
       try {
-        const params: Record<string, string | number> = { page: pg, limit: LIMIT };
+        const params: Record<string, string | number | boolean> = { page: pg, limit: LIMIT };
         if (searchVal.trim()) params.search = searchVal.trim();
         if (dept.trim()) params.department = dept.trim();
+        if (sb) { params.sortBy = sb; params.sortDir = sd; }
+        if (nc) params.noCard = true;
+        if (dc) params.duplicateCards = true;
 
         const res = await api.get<PaginatedResponse<Personnel>>('/personnel', { params });
         const data = res.data;
@@ -211,27 +229,27 @@ export const PersonnelPage = () => {
 
   /* ---- Initial fetch & on page change ---- */
   useEffect(() => {
-    fetchPersonnel(page, search, departmentFilter);
+    fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
-  /* ---- Debounced search / department ---- */
+  /* ---- Debounced search / department / sort / quick-filters ---- */
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setPage(1);
-      fetchPersonnel(1, search, departmentFilter);
+      fetchPersonnel(1, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
     }, 300);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, departmentFilter]);
+  }, [search, departmentFilter, sortBy, sortDir, noCard, duplicateCards]);
 
   /* ---- Clear selection on page / filter change ---- */
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [page, search, departmentFilter]);
+  }, [page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards]);
 
   /* ---------- Bulk selection helpers ---------- */
 
@@ -268,7 +286,7 @@ export const PersonnelPage = () => {
       showToast(`${selectedIds.size} personel silindi.`, 'success');
       setSelectedIds(new Set());
       setBulkDeleteConfirmOpen(false);
-      fetchPersonnel(page, search, departmentFilter);
+      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
     } catch {
       showToast('Toplu silme sırasında hata oluştu.', 'error');
     } finally {
@@ -339,7 +357,7 @@ export const PersonnelPage = () => {
         showToast('Personel başarıyla eklendi.', 'success');
       }
       closeModal();
-      fetchPersonnel(editingId ? page : 1, search, departmentFilter);
+      fetchPersonnel(editingId ? page : 1, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
       if (!editingId) setPage(1);
     } catch (err: any) {
       const msg =
@@ -360,7 +378,7 @@ export const PersonnelPage = () => {
       await api.delete(`/personnel/${deleteTarget.id}`);
       showToast('Personel başarıyla silindi.', 'success');
       setDeleteTarget(null);
-      fetchPersonnel(page, search, departmentFilter);
+      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
     } catch {
       showToast('Personel silinirken hata oluştu.', 'error');
     } finally {
@@ -378,7 +396,7 @@ export const PersonnelPage = () => {
         `${p.firstName} ${p.lastName}: ${p.isActive ? 'Pasif' : 'Aktif'} yapıldı.`,
         'success',
       );
-      fetchPersonnel(page, search, departmentFilter);
+      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
     } catch {
       showToast('Durum değiştirilemedi.', 'error');
     } finally {
@@ -490,7 +508,7 @@ export const PersonnelPage = () => {
       setImportOpen(false);
       setCsvText('');
       setCsvPreview([]);
-      fetchPersonnel(1, search, departmentFilter);
+      fetchPersonnel(1, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
       setPage(1);
     } catch {
       showToast('İçe aktarma sırasında hata oluştu.', 'error');
@@ -516,7 +534,7 @@ export const PersonnelPage = () => {
       });
       setEditingPhotoUrl(res.data.photoUrl);
       showToast('Fotoğraf yüklendi.', 'success');
-      fetchPersonnel(page, search, departmentFilter);
+      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
     } catch (err: any) {
       showToast(err?.response?.data?.message || 'Fotoğraf yüklenemedi.', 'error');
     } finally {
@@ -531,7 +549,7 @@ export const PersonnelPage = () => {
       await api.delete(`/personnel/${editingId}/photo`);
       setEditingPhotoUrl(null);
       showToast('Fotoğraf silindi.', 'success');
-      fetchPersonnel(page, search, departmentFilter);
+      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
     } catch {
       showToast('Fotoğraf silinemedi.', 'error');
     } finally {
@@ -564,6 +582,24 @@ export const PersonnelPage = () => {
 
   const startRow = total === 0 ? 0 : (page - 1) * LIMIT + 1;
   const endRow = Math.min(page * LIMIT, total);
+
+  /* ---- Sort helper ---- */
+  const handleSort = (col: string) => {
+    if (sortBy === col) {
+      setSortDir((prev) => (prev === 'ASC' ? 'DESC' : 'ASC'));
+    } else {
+      setSortBy(col);
+      setSortDir('ASC');
+    }
+    setPage(1);
+  };
+
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortBy !== col) return <ChevronsUpDown className="w-3 h-3 opacity-40" />;
+    return sortDir === 'ASC'
+      ? <ChevronUp className="w-3 h-3 text-[#0078d4]" />
+      : <ChevronDown className="w-3 h-3 text-[#0078d4]" />;
+  };
 
   /* ---- Column count for colSpan ---- */
   const colCount = isAdmin ? 8 : 7;
@@ -622,6 +658,26 @@ export const PersonnelPage = () => {
               className="px-3 py-2 w-full sm:w-44 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0078d4] focus:border-transparent"
             />
 
+            {/* Quick-filter checkboxes */}
+            <label className="inline-flex items-center gap-1.5 cursor-pointer select-none flex-shrink-0">
+              <input
+                type="checkbox"
+                checked={noCard}
+                onChange={(e) => { setNoCard(e.target.checked); if (e.target.checked) setDuplicateCards(false); setPage(1); }}
+                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-[#0078d4] focus:ring-[#0078d4] cursor-pointer"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">Kartsız</span>
+            </label>
+            <label className="inline-flex items-center gap-1.5 cursor-pointer select-none flex-shrink-0">
+              <input
+                type="checkbox"
+                checked={duplicateCards}
+                onChange={(e) => { setDuplicateCards(e.target.checked); if (e.target.checked) setNoCard(false); setPage(1); }}
+                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-[#0078d4] focus:ring-[#0078d4] cursor-pointer"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">Hatalı Kayıtlar</span>
+            </label>
+
             {/* Import button */}
             <button
               onClick={() => setImportOpen(true)}
@@ -675,22 +731,36 @@ export const PersonnelPage = () => {
                     />
                   </th>
                 )}
-                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300">
-                  Ad Soyad
+                <th
+                  className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 cursor-pointer select-none hover:text-[#0078d4] dark:hover:text-[#4da3f5] transition-colors"
+                  onClick={() => handleSort('firstName')}
+                >
+                  <span className="inline-flex items-center gap-1">Ad Soyad <SortIcon col="firstName" /></span>
                 </th>
-                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300">
-                  Kart No
+                <th
+                  className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 cursor-pointer select-none hover:text-[#0078d4] dark:hover:text-[#4da3f5] transition-colors"
+                  onClick={() => handleSort('cardNumber')}
+                >
+                  <span className="inline-flex items-center gap-1">Kart No <SortIcon col="cardNumber" /></span>
                 </th>
                 <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 hidden md:table-cell">
                   Kullanıcı Adı
                 </th>
-                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 hidden md:table-cell">
-                  Departman
+                <th
+                  className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 hidden md:table-cell cursor-pointer select-none hover:text-[#0078d4] dark:hover:text-[#4da3f5] transition-colors"
+                  onClick={() => handleSort('department')}
+                >
+                  <span className="inline-flex items-center gap-1">Departman <SortIcon col="department" /></span>
                 </th>
                 <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 hidden lg:table-cell">
                   Son Giriş
                 </th>
-                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300">Durum</th>
+                <th
+                  className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 cursor-pointer select-none hover:text-[#0078d4] dark:hover:text-[#4da3f5] transition-colors"
+                  onClick={() => handleSort('isActive')}
+                >
+                  <span className="inline-flex items-center gap-1">Durum <SortIcon col="isActive" /></span>
+                </th>
                 <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 text-right">
                   İşlemler
                 </th>
@@ -712,8 +782,8 @@ export const PersonnelPage = () => {
                     <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
                       <Users className="w-10 h-10" />
                       <span className="text-sm">
-                        {search || departmentFilter
-                          ? 'Aramayla eşleşen personel bulunamadı.'
+                        {search || departmentFilter || noCard || duplicateCards
+                          ? 'Filtrelerle eşleşen personel bulunamadı.'
                           : 'Henüz personel kaydı yok.'}
                       </span>
                     </div>

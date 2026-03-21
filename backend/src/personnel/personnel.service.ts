@@ -15,6 +15,10 @@ interface FindAllOptions {
   department?: string;
   page?: number;
   limit?: number;
+  sortBy?: string;
+  sortDir?: 'ASC' | 'DESC';
+  noCard?: boolean;
+  duplicateCards?: boolean;
 }
 
 export interface PaginatedResult<T> {
@@ -36,7 +40,7 @@ export class PersonnelService {
   ) {}
 
   async findAll(options: FindAllOptions = {}): Promise<PaginatedResult<any>> {
-    const { search, department, page = 1, limit = 20 } = options;
+    const { search, department, page = 1, limit = 20, sortBy, sortDir = 'DESC', noCard, duplicateCards } = options;
 
     const qb = this.personnelRepository.createQueryBuilder('p');
 
@@ -53,7 +57,31 @@ export class PersonnelService {
       });
     }
 
-    qb.orderBy('p.createdAt', 'DESC');
+    if (noCard) {
+      qb.andWhere('(p.cardNumber IS NULL OR p.cardNumber = :empty)', { empty: '' });
+    }
+
+    if (duplicateCards) {
+      qb.andWhere(
+        `p.cardNumber IN (
+          SELECT card_number FROM personnel
+          WHERE card_number IS NOT NULL AND card_number != ''
+          GROUP BY card_number HAVING COUNT(*) > 1
+        )`,
+      );
+    }
+
+    const allowedSort: Record<string, string> = {
+      firstName: 'p.firstName',
+      lastName: 'p.lastName',
+      cardNumber: 'p.cardNumber',
+      department: 'p.department',
+      isActive: 'p.isActive',
+      createdAt: 'p.createdAt',
+    };
+    const orderField = allowedSort[sortBy ?? ''] ?? 'p.createdAt';
+    const orderDir = sortDir === 'ASC' ? 'ASC' : 'DESC';
+    qb.orderBy(orderField, orderDir);
     qb.skip((page - 1) * limit).take(limit);
 
     const [data, total] = await qb.getManyAndCount();

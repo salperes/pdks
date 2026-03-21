@@ -372,3 +372,35 @@ Rev. Report: (
   Yeni dosyalar: 7
 )
 ---------------------------------------------------------
+Rev. ID    : 039
+Rev. Date  : 21.03.2026
+Rev. Time  : 17:00:00
+Rev. Prompt: Personel yönetimi — kolon sıralaması, kartsız personel filtresi, hatalı kayıtlar filtresi
+
+Rev. Report: (
+  Personel listesinde kolon bazlı artan/azalan sıralama, kartsız personel
+  ve hatalı kayıt (mükerrer kart) filtreleri eklendi.
+
+  BACKEND — personnel.service.ts:
+  - FindAllOptions interface'e sortBy, sortDir, noCard, duplicateCards eklendi
+  - findAll(): noCard filtresi (cardNumber IS NULL OR = ''), duplicateCards filtresi
+    (subquery ile COUNT > 1 olan kart numaraları), allowedSort haritası ile
+    dinamik ORDER BY (firstName, lastName, cardNumber, department, isActive, createdAt)
+
+  BACKEND — personnel.controller.ts:
+  - @Query params eklendi: sortBy, sortDir, noCard, duplicateCards
+  - findAll() çağrısına yeni parametreler iletiliyor
+
+  FRONTEND — Personnel/index.tsx:
+  - sortBy, sortDir, noCard, duplicateCards state'leri eklendi
+  - fetchPersonnel() yeni parametreleri kabul ediyor, API params'a ekliyor
+  - handleSort(): kolon adına göre sıralama yönünü değiştirir
+  - SortIcon bileşeni: ChevronUp/Down (aktif) | ChevronsUpDown (pasif)
+  - Tablo başlıkları: Ad Soyad, Kart No, Departman, Durum — tıklanabilir
+  - Filtre çubuğuna "Kartsız" ve "Hatalı Kayıtlar" checkbox'ları eklendi
+    (ikisi birbirini dışlar: biri seçilince diğeri sıfırlanır)
+
+  Değişen dosyalar: 3 (personnel.service.ts, personnel.controller.ts,
+    frontend/Personnel/index.tsx)
+)
+---------------------------------------------------------

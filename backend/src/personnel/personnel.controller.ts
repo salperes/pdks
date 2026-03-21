@@ -42,12 +42,20 @@ export class PersonnelController {
     @Query('department') department?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
+    @Query('noCard') noCard?: string,
+    @Query('duplicateCards') duplicateCards?: string,
   ) {
     return this.personnelService.findAll({
       search,
       department,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
+      sortBy,
+      sortDir: sortDir === 'ASC' ? 'ASC' : 'DESC',
+      noCard: noCard === 'true',
+      duplicateCards: duplicateCards === 'true',
     });
   }
 
