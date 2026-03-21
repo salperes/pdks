@@ -2,346 +2,8 @@
 
 > Max 11 kayıt tutulur. 11 kayıt dolunca eski 1-10 arşivlenir (`temp/changelog{NNN}-{NNN}.md`),
 > yeni dosya eski dosyanın son kaydıyla başlar (bağlam referansı olarak).
-> Arşiv: temp/changelog_001-010.md, temp/changelog_010-020.md, temp/changelog_020-029.md
+> Arşiv: temp/changelog_001-010.md, temp/changelog_010-020.md, temp/changelog_020-029.md, temp/changelog_028-038.md
 
----------------------------------------------------------
-Rev. ID    : 028
-Rev. Date  : 22.02.2026
-Rev. Time  : 17:58:54
-Rev. Prompt: Bildirim sistemi msgService'e taşıma — çift kanal (e-posta + WhatsApp)
-
-Rev. Report: (
-  Tüm bildirim gönderimlerini nodemailer/SMTP'den msgService API'sine taşıdı.
-  E-posta Ayarları kartı kaldırıldı, bildirim türleri Mesajlaşma Servisi altına
-  birleştirildi. Her bildirim türü artık hem e-posta hem WhatsApp kanalını
-  bağımsız olarak destekliyor.
-
-  BACKEND — SystemSettings Entity:
-  - 9 yeni kolon eklendi (her bildirim türü için email/WA toggle + WA alıcıları):
-    notify_absence_email_enabled, notify_absence_wa_enabled, notify_absence_wa_recipients,
-    notify_hr_email_enabled, notify_hr_wa_enabled, notify_hr_wa_recipients,
-    notify_system_error_email_enabled, notify_system_error_wa_enabled,
-    notify_system_error_wa_recipients
-  - SMTP kolonları @deprecated olarak işaretlendi (silinmedi, kullanılmıyor)
-
-  BACKEND — EmailLog Entity:
-  - channel kolonu eklendi (varchar(20), default: 'email') — 'email' | 'whatsapp'
-
-  BACKEND — EmailModule:
-  - MessagingModule import eklendi (MessagingService enjeksiyonu için)
-
-  BACKEND — EmailService (tam refactor):
-  - nodemailer import ve getTransporter() kaldırıldı
-  - MessagingService constructor'a enjekte edildi
-  - sendEmail(): nodemailer yerine messagingService.sendEmail() kullanıyor
-  - Yeni sendWhatsAppNotification(): WA gönderimi + EmailLog kaydı (channel: 'whatsapp')
-  - scheduledCheck(): Guard emailEnabled → msgServiceEnabled olarak değişti
-  - sendAbsenceWarnings(): Çift kanal — e-posta + WhatsApp bağımsız gönderim
-  - sendHrDailyReport(): Çift kanal
-  - sendSystemErrorNotification(): Guard güncellendi + WA kanalı eklendi
-  - testConnection() ve sendTestEmail() kaldırıldı (MessagingController hallediyor)
-  - getEmailLogs(): Opsiyonel channel filtresi eklendi
-
-  BACKEND — EmailController:
-  - POST /email/test-connection kaldırıldı
-  - POST /email/send-test kaldırıldı
-  - GET /email/logs: channel query parametresi eklendi
-
-  BACKEND — Settings Service/Controller:
-  - Pick tipine ve body tipine 9 yeni alan eklendi
-
-  FRONTEND — Settings Sayfası (büyük refactor):
-  - EmailSettings + MsgServiceSettings interfaceleri → birleşik NotificationSettings
-  - EmailLogEntry → NotificationLogEntry (channel alanı eklendi)
-  - Ayrık state'ler → tek notifSettings state'i
-  - E-posta Ayarları kartı tamamen kaldırıldı
-  - Mesajlaşma Servisi kartı genişletildi → "Mesajlaşma & Bildirimler":
-    · Master toggle + bağlantı ayarları (URL + API Key)
-    · Test butonları (bağlantı, e-posta, WhatsApp)
-    · Bildirim Türleri: her tür için master toggle + kanal toggle'ları
-      - Devamsızlık: saat + e-posta toggle/alıcılar + WA toggle/telefonlar
-      - İK Rapor: saat + e-posta toggle/alıcılar + WA toggle/telefonlar
-      - Sistem Hatası: e-posta toggle/alıcılar + WA toggle/telefonlar
-    · Bildirim Geçmişi tablosu — Kanal kolonu (e-posta mavi / WhatsApp yeşil badge)
-
-  Değişen backend: 7 (system-settings.entity.ts, email-log.entity.ts,
-    email.module.ts, email.service.ts, email.controller.ts,
-    settings.service.ts, settings.controller.ts)
-  Değişen frontend: 1 (Settings/index.tsx)
-)
----------------------------------------------------------
-Rev. ID    : 030
-Rev. Date  : 26.02.2026
-Rev. Time  : 18:35:19
-Rev. Prompt: Operatör paneli yeniden tasarım — iki sekmeli form + route kısıtlaması
-
-Rev. Report: (
-  Operatör paneli tamamen yeniden tasarlandı. Modal yerine iki sekmeli inline
-  form yapısına geçildi. Operatör kullanıcıları artık sadece operatör paneline
-  erişebiliyor (diğer sayfalar kısıtlı).
-
-  BACKEND — TempCardAssignment Entity:
-  - 4 yeni kolon: document_type (kimlik/ehliyet/pasaport), shelf_no,
-    visited_personnel_id (FK→Personnel), visit_reason
-  - visitedPersonnel ManyToOne relation eklendi
-
-  BACKEND — IssueTempCardDto:
-  - 5 yeni alan: guestPhone, documentType, shelfNo, visitedPersonnelId, visitReason
-
-  BACKEND — OperatorPanelService:
-  - issueTempCard: guestPhone desteği, yeni alanlar assignment kaydına dahil
-  - getActiveAssignments: visitedPersonnel relation join eklendi
-  - getHistory: visitedPersonnel relation eklendi
-
-  FRONTEND — App.tsx (Route Kısıtlaması):
-  - OperatorRedirect bileşeni eklendi: operator rolündeki kullanıcıları
-    /operator-panel'e yönlendiriyor
-  - Tüm non-operator route'lar OperatorRedirect ile sarmalandı
-  - Operatör artık dashboard, personel, cihazlar, raporlar vb. sayfalara erişemiyor
-
-  FRONTEND — Sidebar.tsx:
-  - Operatör rolü sadece "Operatör Paneli" navigasyon öğesini görüyor
-  - Admin/viewer rolleri ise tüm menü yapısını görmeye devam ediyor
-
-  FRONTEND — OperatorPanel/index.tsx (Tam Yeniden Yazım):
-  - Modal tabanlı tasarım → inline iki sekmeli form tasarımına geçildi
-  - Ana görünüm: "Geçici Kart Ver" formu + "Geçmiş" arasında geçiş
-  - Form sekmeleri:
-    · "Misafir Geçici Kart": ad, soyad, telefon, kimlik türü dropdown
-      (kimlik/ehliyet/pasaport), raf no, ziyaret edilen personel (aranabilir),
-      ziyaret nedeni (textarea)
-    · "Personel Geçici Kart": personel arama (typeahead) + sağ tarafta
-      fotoğraf önizleme
-  - Ortak alanlar: bitiş zamanı (9:00/12:00/15:00/18:00 dropdown, varsayılan
-    18:00), kart no, cihaz seçimi (lokasyon bazlı gruplu)
-  - Aktif kartlar tablosu formun altında gösteriliyor
-  - Geçmiş görünümü sayfalı tablo
-  - PersonnelSearchField: yeniden kullanılabilir arama bileşeni (debounce)
-
-  FRONTEND — types/index.ts:
-  - TempCardAssignment: documentType, shelfNo, visitedPersonnelId,
-    visitedPersonnel, visitReason alanları eklendi
-
-  Değişen backend: 3 (temp-card-assignment.entity.ts, issue-temp-card.dto.ts,
-    operator-panel.service.ts)
-  Değişen frontend: 4 (App.tsx, Sidebar.tsx, OperatorPanel/index.tsx, types/index.ts)
-)
----------------------------------------------------------
-Rev. ID    : 031
-Rev. Date  : 26.02.2026
-Rev. Time  : 18:51:25
-Rev. Prompt: Operatör paneli — kart geri verme + geçiş kayıtları sekmeleri
-
-Rev. Report: (
-  Operatör paneline iki yeni sekme eklendi: "Kart Geri Verme" ve "Geçiş Kayıtları".
-  Toplam 4 sekme: Misafir Geçici Kart, Personel Geçici Kart, Kart Geri Verme,
-  Geçiş Kayıtları. Backend değişikliği gerekmedi — mevcut endpoint'ler yeterli.
-
-  FRONTEND — OperatorPanel/index.tsx (Yeniden Yapılandırma):
-  - 2 sekmeli yapı → 4 sekmeli yapıya geçildi
-  - view state: 'form' | 'history' → 'guest' | 'personnel' | 'return' | 'access-logs'
-  - formTab state kaldırıldı (guest/personnel artık doğrudan üst seviye sekme)
-  - Üst bar: 4 sekme butonu (ikon + etiket), lokasyon bilgisi gösterimi
-  - Bileşen ayrımı: FormSection, ReturnSection, AccessLogsSection alt bileşenlere bölündü
-
-  SEKME 3 — Kart Geri Verme (ReturnSection):
-  - Alt sekmeler: "Aktif Kartlar" + "Geçmiş"
-  - Aktif kartlar: mevcut tablonun form altından buraya taşınması
-  - Her satırda "Geri Al" butonu (revoke işlemi)
-  - fetchActive() artık locationId parametresi gönderiyor (operatörün lokasyonu)
-  - Geçmiş: sayfalı tablo (mevcut history view'ın taşınması)
-  - Boş durum gösterimi (CreditCard ikonu + mesaj)
-
-  SEKME 4 — Geçiş Kayıtları (AccessLogsSection):
-  - Operatörün varsayılan lokasyonundaki giriş/çıkış kayıtları
-  - Lokasyon atanmamışsa bilgi mesajı (AlertCircle)
-  - Filtreler: tarih (bugün varsayılan), personel arama (Enter veya Ara butonu)
-  - Tablo: Personel (ad + departman), Cihaz, Zaman, Yön (Giriş/Çıkış badge)
-  - Sayfalama (50/sayfa)
-  - 30 saniyede bir auto-refresh
-  - Manuel yenile butonu (RefreshCw ikonu, yüklenirken animasyon)
-  - Mevcut GET /access-logs?locationId=...&startDate=...&endDate=... endpoint'i kullanılıyor
-
-  Değişen dosyalar: 1 (OperatorPanel/index.tsx)
-)
----------------------------------------------------------
-Rev. ID    : 032
-Rev. Date  : 26.02.2026
-Rev. Time  : 19:02:33
-Rev. Prompt: Geçici kart otomatik revoke — 1 saat grace period
-
-Rev. Report: (
-  Geçici kartların otomatik temizleme zamanlaması değiştirildi. Önceden kart
-  süre dolduğu anda (~60sn içinde) cihazlardan siliniyordu. Artık süre
-  dolduktan 1 saat sonra silinecek (grace period).
-
-  BACKEND — OperatorPanelService.cleanupExpired():
-  - LessThan(new Date()) → LessThan(new Date(Date.now() - 1h))
-  - graceMs = 60 * 60 * 1000 (1 saat)
-  - Örnek: expiresAt=18:00 → cihazdan silme 19:00'da gerçekleşir
-
-  Değişen dosyalar: 1 (operator-panel.service.ts)
-)
----------------------------------------------------------
-Rev. ID    : 033
-Rev. Date  : 26.02.2026
-Rev. Time  : 19:22:46
-Rev. Prompt: Operatör paneli fotoğraf boyutu 1.5x büyütme
-
-Rev. Report: (
-  Operatör panelindeki personel fotoğrafları 1.5x büyütüldü.
-
-  FRONTEND — OperatorPanel/index.tsx:
-  - Personel sekmesi fotoğraf kutusu: w-24 h-28 → w-36 h-[168px] (96×112 → 144×168px)
-  - Kamera placeholder ikonu: w-8 h-8 → w-12 h-12
-  - İsim etiketi max genişlik: max-w-24 → max-w-36
-  - Arama dropdown avatar: w-7 h-7 → w-10 h-10 (28→40px), font text-xs → text-sm
-
-  Değişen dosyalar: 1 (OperatorPanel/index.tsx)
-)
----------------------------------------------------------
-Rev. ID    : 034
-Rev. Date  : 18.03.2026
-Rev. Time  : 10:15:00
-Rev. Prompt: SSO session timeout — browser kapatılıp yeniden bağlanınca sonsuz refresh döngüsü düzeltmesi
-
-Rev. Report: (
-  Browser kapatılıp token süresi dolduktan sonra SSO ile yeniden bağlanmaya
-  çalışıldığında sayfa sürekli refresh yapıyordu. Stale Zustand persist verisi
-  ile süresi dolmuş token kombinasyonu sonsuz döngüye neden oluyordu.
-
-  KÖK NEDEN:
-  - Zustand persist ('pdks-auth') localStorage'da isAuthenticated:true tutuyordu
-  - api.ts interceptor refresh token başarısız olunca sadece accessToken/refreshToken
-    siliyor, pdks-auth persist verisini silmiyordu
-  - /login sayfasına yönlendirilince isAuthenticated:true görülüyor → Navigate to /
-  - / → API 401 → refresh fail → /login → isAuthenticated:true → / → sonsuz döngü
-  - SSO effect'te isAuthenticated guard URL'deki sso_token'ı da engelliyordu
-
-  FRONTEND — services/api.ts:
-  - Refresh fail catch bloğu: localStorage.removeItem('pdks-auth') eklendi
-    (Zustand persist temizlenerek döngü kırılıyor)
-
-  FRONTEND — pages/Login/index.tsx:
-  - SSO useEffect guard: || isAuthenticated kaldırıldı (ssoAttempted.current yeterli)
-  - Navigate to / guard: sso_token varsa atlanıyor (hasSsoToken kontrolü eklendi)
-    Böylece stale isAuthenticated olsa bile gelen SSO token işleniyor
-
-  Değişen dosyalar: 2 (services/api.ts, pages/Login/index.tsx)
-)
----------------------------------------------------------
-Rev. ID    : 035
-Rev. Date  : 18.03.2026
-Rev. Time  : 11:00:00
-Rev. Prompt: Sistem hatası bildirimi — ardışık hata eşiği (varsayılan 4 senkronizasyon, ayarlanabilir)
-
-Rev. Report: (
-  Cihaz senkronizasyon hatası bildirimi için ardışık hata eşiği eklendi.
-  Önceden her senkronizasyon hatasında anlık bildirim gönderiliyordu.
-  Artık belirlenen eşiğe ulaşılınca bildirim gönderiliyor (varsayılan: 4).
-  WAN üzerindeki cihazların geçici erişim kesintilerinde gereksiz
-  bildirim oluşturması önlendi.
-
-  BACKEND — SystemSettings Entity:
-  - deviceOfflineThreshold: int, default 4 (device_offline_threshold kolonu)
-
-  BACKEND — DeviceCommModule:
-  - SystemSettings entity TypeORM forFeature'a eklendi
-
-  BACKEND — SyncService:
-  - failureCount: Map<string, number> — cihaz başına ardışık hata sayacı
-  - settingsRepository enjekte edildi (threshold okunur)
-  - Ping başarısız: failureCount artırılır; count === threshold olunca bildirim
-  - Sync başarısız: failureCount artırılır; count === threshold olunca bildirim
-  - Sync başarılı: failureCount sıfırlanır
-
-  BACKEND — SettingsController:
-  - PATCH /settings body tipine deviceOfflineThreshold?: number eklendi
-
-  FRONTEND — Settings/index.tsx:
-  - NotificationSettings interface'e deviceOfflineThreshold: number eklendi
-  - Default state: 4, loadSettings'de DB'den okunuyor
-  - handleSaveNotifSettings: deviceOfflineThreshold gönderiliyor
-  - Sistem Hatası kartına "Ardışık hata eşiği" number input eklendi (1-20 arası)
-
-  Değişen backend: 3 (system-settings.entity.ts, device-comm.module.ts, sync.service.ts,
-    settings.controller.ts)
-  Değişen frontend: 1 (Settings/index.tsx)
-)
----------------------------------------------------------
-Rev. ID    : 036
-Rev. Date  : 21.03.2026
-Rev. Time  : --:--:--
-Rev. Prompt: MSS Personeli — Portal senkronizasyon modülü (günde 4 kez otomatik, Admin ayarlardan yapılandırma)
-
-Rev. Report: (
-  Portal uygulamasının GET /api/users/sync endpoint'inden MSS personelini
-  günde 4 kez (00:00 / 06:00 / 12:00 / 18:00) çekip PDKS'e aktaran modül eklendi.
-  Admin > Ayarlar sayfasından Portal URL, API Key girilip bağlantı testi yapılabiliyor;
-  manuel senkronizasyon da tetiklenebiliyor.
-
-  BACKEND — Personnel Entity:
-  - cardNumber: nullable:true eklendi (Portal'dan gelen personelin kartı olmayabilir)
-
-  BACKEND — SystemSettings Entity:
-  - 5 yeni kolon: portal_api_url, portal_api_key, portal_sync_enabled,
-    portal_last_sync, portal_last_sync_count
-
-  BACKEND — Yeni Modül: portal-sync/
-  - portal-sync.service.ts:
-    · testConnection(): Portal URL + API Key ile erişim testi, kullanıcı sayısı döner
-    · syncNow(): GET {portalApiUrl}/api/users/sync → username (adUsername) ile eşleşme
-      Var: firstName/lastName/email/department/title/phone/isActive güncellenir
-      Yok: yeni Personnel oluşturulur (cardNumber=null)
-      Son sync zamanı ve kayıt sayısı settings'e kaydedilir
-    · @Cron('0 0,6,12,18 * * *'): günde 4 kez zamanlanmış senkronizasyon
-  - portal-sync.controller.ts:
-    · GET  /api/v1/portal-sync/status — son sync bilgisi
-    · POST /api/v1/portal-sync/test   — bağlantı testi
-    · POST /api/v1/portal-sync/sync   — manuel senkronizasyon
-  - portal-sync.module.ts
-
-  BACKEND — AppModule:
-  - PortalSyncModule import eklendi
-
-  BACKEND — SettingsService:
-  - portalApiKey maskeleme eklendi (getSettings + updateSettings)
-  - updateSettings Pick tipine portal alanları eklendi
-
-  FRONTEND — Settings/index.tsx:
-  - Globe import eklendi
-  - Portal state: portalSettings, portalStatus, loading/saving state'leri
-  - fetchPortalSettings(): /settings + /portal-sync/status paralel çekim
-  - handleSavePortalSettings(), handlePortalTest(), handlePortalSync()
-  - "Portal Entegrasyonu" kartı eklendi:
-    · MSS Personeli Senkronizasyonu toggle
-    · Portal URL + API Key inputları
-    · Son senkronizasyon zamanı ve kayıt sayısı
-    · Kaydet / Bağlantı Testi / Şimdi Senkronize Et butonları
-
-  Değişen backend: 5 (personnel.entity.ts, system-settings.entity.ts,
-    settings.service.ts, app.module.ts + yeni portal-sync/ modülü)
-  Değişen frontend: 1 (Settings/index.tsx)
-)
----------------------------------------------------------
-Rev. ID    : 037
-Rev. Date  : 21.03.2026
-Rev. Time  : 14:10:00
-Rev. Prompt: Portal sync endpoint duzeltme — /api/users/sync yerine /api/users?limit=1000
-
-Rev. Report: (
-  Portal'da /api/users/sync endpointi uretim ortaminda NestJS route cakismasi
-  nedeniyle 400 hatasi veriyordu (sync string'i /:id parametresiyle eslesiyor).
-  PDKS, Portal'in paginated /api/users?limit=1000 endpoint'ini kullanacak sekilde guncellendi.
-
-  BACKEND — portal-sync.service.ts:
-  - fetchPortalUsers() private metodu eklendi:
-    . URL: {portalApiUrl}/api/users?limit=1000
-    . Response: {users: PortalUser[], total, page, limit} wrapper'indan users[] ayiklaniyor
-  - testConnection() ve syncNow() fetchPortalUsers() kullanacak sekilde refactor edildi
-
-  Degisen dosyalar: 1 (portal-sync.service.ts)
-)
 ---------------------------------------------------------
 Rev. ID    : 038
 Rev. Date  : 21.03.2026
@@ -349,9 +11,8 @@ Rev. Time  : 15:30:00
 Rev. Prompt: Ayarlar sayfasi alt sayfalara bolundu, Denetim Gunlugu ayri menu
 
 Rev. Report: (
-  1567 satirlik tek Ayarlar sayfasi 5 alt sayfaya bolundu.
-  Sol menude Ayarlar collapsible parent yapildi.
-  Denetim Gunlugu ayri bir ust-duzey menu ogesi oldu.
+  1567 satirlik tek Ayarlar sayfasi 5 alt sayfaya bolundu. Sol menude Ayarlar
+  collapsible parent yapildi. Denetim Gunlugu ayri ust-duzey menu ogesi oldu.
 
   FRONTEND — Yeni sayfalar:
   - Settings/Genel.tsx      → /admin/settings/genel (Calisma Saatleri)
@@ -411,12 +72,42 @@ Rev. Prompt: Personel — Kullanıcı Adı ve Son Giriş kolonlarına da sırala
 
 Rev. Report: (
   BACKEND — personnel.service.ts:
-  - allowedSort haritasına username ve lastAccessTime eklendi
-  - lastAccessTime sıralaması için LEFT JOIN subquery: MAX(event_time) GROUP BY personnel_id
+  - allowedSort haritasına username eklendi
+  - lastAccessTime sıralaması için correlated subquery: MAX(event_time) doğrudan ORDER BY'da
+    (LEFT JOIN subquery TypeORM'da alias çözümleyemediği için düzeltildi)
 
   FRONTEND — Personnel/index.tsx:
   - "Kullanıcı Adı" ve "Son Giriş" başlıkları tıklanabilir hale getirildi
 
   Değişen dosyalar: 2 (personnel.service.ts, frontend/Personnel/index.tsx)
+)
+---------------------------------------------------------
+Rev. ID    : 041
+Rev. Date  : 21.03.2026
+Rev. Time  : 18:00:00
+Rev. Prompt: Personel CSV dışa aktarma (Ad, Soyad, Kart No, Kullanıcı Adı, Departman, Aktif/Pasif)
+
+Rev. Report: (
+  Personel listesini UTF-8 BOM CSV olarak indiren endpoint ve frontend butonu eklendi.
+  Portal eşleştirmesi için kullanılacak.
+
+  BACKEND — personnel.service.ts:
+  - exportCsv(): Tüm personeli firstName/lastName sıralı çekip ; ayrımlı CSV üretir
+    Sütunlar: Ad;Soyad;KartNo;KullaniciAdi;Departman;Aktif
+    Değerlerde özel karakter varsa RFC 4180 çift-tırnak kaçışı uygulanır
+
+  BACKEND — personnel.controller.ts:
+  - Res + Response importları eklendi
+  - GET /personnel/export: BOM (\uFEFF) ile UTF-8 CSV response döner
+    Content-Disposition: attachment; filename="personel.csv"
+    (:id'den önce tanımlandı — route çakışmasını önlemek için)
+
+  FRONTEND — Personnel/index.tsx:
+  - Download ikonu import edildi
+  - handleExport(): api.get responseType:'blob' → Blob URL → <a download> tetikleme
+  - "Dışa Aktar" butonu filtre çubuğuna eklendi (Toplu İçe Aktar'ın soluna)
+
+  Değişen dosyalar: 3 (personnel.service.ts, personnel.controller.ts,
+    frontend/Personnel/index.tsx)
 )
 ---------------------------------------------------------

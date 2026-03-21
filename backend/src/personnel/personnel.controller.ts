@@ -7,11 +7,13 @@ import {
   Param,
   Body,
   Query,
+  Res,
   UseGuards,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -46,6 +48,7 @@ export class PersonnelController {
     @Query('sortDir') sortDir?: string,
     @Query('noCard') noCard?: string,
     @Query('duplicateCards') duplicateCards?: string,
+    @Query('activeOnly') activeOnly?: string,
   ) {
     return this.personnelService.findAll({
       search,
@@ -56,6 +59,7 @@ export class PersonnelController {
       sortDir: sortDir === 'ASC' ? 'ASC' : 'DESC',
       noCard: noCard === 'true',
       duplicateCards: duplicateCards === 'true',
+      activeOnly: activeOnly === 'true',
     });
   }
 
@@ -101,6 +105,14 @@ export class PersonnelController {
       details: { count: result.deleted, ids },
     });
     return result;
+  }
+
+  @Get('export')
+  async exportCsv(@Res() res: Response) {
+    const csv = await this.personnelService.exportCsv();
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="personel.csv"');
+    res.send('\uFEFF' + csv); // BOM → Excel UTF-8
   }
 
   @Get(':id')

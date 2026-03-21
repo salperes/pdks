@@ -11,6 +11,7 @@ import {
   ChevronDown,
   UserPlus,
   Upload,
+  Download,
   BarChart3,
   Cpu,
   LogIn,
@@ -137,6 +138,7 @@ export const PersonnelPage = () => {
   const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('DESC');
   const [noCard, setNoCard] = useState(false);
   const [duplicateCards, setDuplicateCards] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
 
   /* ---- Modal state ---- */
   const [modalOpen, setModalOpen] = useState(false);
@@ -202,6 +204,7 @@ export const PersonnelPage = () => {
       sd: 'ASC' | 'DESC',
       nc: boolean,
       dc: boolean,
+      si: boolean,
     ) => {
       setLoading(true);
       try {
@@ -211,6 +214,7 @@ export const PersonnelPage = () => {
         if (sb) { params.sortBy = sb; params.sortDir = sd; }
         if (nc) params.noCard = true;
         if (dc) params.duplicateCards = true;
+        if (!si) params.activeOnly = true;
 
         const res = await api.get<PaginatedResponse<Personnel>>('/personnel', { params });
         const data = res.data;
@@ -229,7 +233,7 @@ export const PersonnelPage = () => {
 
   /* ---- Initial fetch & on page change ---- */
   useEffect(() => {
-    fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
+    fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards, showInactive);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
@@ -238,18 +242,18 @@ export const PersonnelPage = () => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setPage(1);
-      fetchPersonnel(1, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
+      fetchPersonnel(1, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards, showInactive);
     }, 300);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, departmentFilter, sortBy, sortDir, noCard, duplicateCards]);
+  }, [search, departmentFilter, sortBy, sortDir, noCard, duplicateCards, showInactive]);
 
   /* ---- Clear selection on page / filter change ---- */
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards]);
+  }, [page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards, showInactive]);
 
   /* ---------- Bulk selection helpers ---------- */
 
@@ -286,7 +290,7 @@ export const PersonnelPage = () => {
       showToast(`${selectedIds.size} personel silindi.`, 'success');
       setSelectedIds(new Set());
       setBulkDeleteConfirmOpen(false);
-      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
+      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards, showInactive);
     } catch {
       showToast('Toplu silme sırasında hata oluştu.', 'error');
     } finally {
@@ -357,7 +361,7 @@ export const PersonnelPage = () => {
         showToast('Personel başarıyla eklendi.', 'success');
       }
       closeModal();
-      fetchPersonnel(editingId ? page : 1, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
+      fetchPersonnel(editingId ? page : 1, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards, showInactive);
       if (!editingId) setPage(1);
     } catch (err: any) {
       const msg =
@@ -378,7 +382,7 @@ export const PersonnelPage = () => {
       await api.delete(`/personnel/${deleteTarget.id}`);
       showToast('Personel başarıyla silindi.', 'success');
       setDeleteTarget(null);
-      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
+      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards, showInactive);
     } catch {
       showToast('Personel silinirken hata oluştu.', 'error');
     } finally {
@@ -396,7 +400,7 @@ export const PersonnelPage = () => {
         `${p.firstName} ${p.lastName}: ${p.isActive ? 'Pasif' : 'Aktif'} yapıldı.`,
         'success',
       );
-      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
+      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards, showInactive);
     } catch {
       showToast('Durum değiştirilemedi.', 'error');
     } finally {
@@ -450,6 +454,22 @@ export const PersonnelPage = () => {
       showToast(err?.response?.data?.message || 'Tanımlama başarısız.', 'error');
     } finally {
       setEnrollingDeviceId(null);
+    }
+  };
+
+  /* ---------- Export ---------- */
+
+  const handleExport = async () => {
+    try {
+      const res = await api.get('/personnel/export', { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv;charset=utf-8' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'personel.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      showToast('Dışa aktarma başarısız.', 'error');
     }
   };
 
@@ -508,7 +528,7 @@ export const PersonnelPage = () => {
       setImportOpen(false);
       setCsvText('');
       setCsvPreview([]);
-      fetchPersonnel(1, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
+      fetchPersonnel(1, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards, showInactive);
       setPage(1);
     } catch {
       showToast('İçe aktarma sırasında hata oluştu.', 'error');
@@ -534,7 +554,7 @@ export const PersonnelPage = () => {
       });
       setEditingPhotoUrl(res.data.photoUrl);
       showToast('Fotoğraf yüklendi.', 'success');
-      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
+      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards, showInactive);
     } catch (err: any) {
       showToast(err?.response?.data?.message || 'Fotoğraf yüklenemedi.', 'error');
     } finally {
@@ -549,7 +569,7 @@ export const PersonnelPage = () => {
       await api.delete(`/personnel/${editingId}/photo`);
       setEditingPhotoUrl(null);
       showToast('Fotoğraf silindi.', 'success');
-      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards);
+      fetchPersonnel(page, search, departmentFilter, sortBy, sortDir, noCard, duplicateCards, showInactive);
     } catch {
       showToast('Fotoğraf silinemedi.', 'error');
     } finally {
@@ -677,6 +697,26 @@ export const PersonnelPage = () => {
               />
               <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">Hatalı Kayıtlar</span>
             </label>
+
+            {/* Show inactive checkbox */}
+            <label className="inline-flex items-center gap-1.5 cursor-pointer select-none flex-shrink-0">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => { setShowInactive(e.target.checked); setPage(1); }}
+                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-[#0078d4] focus:ring-[#0078d4] cursor-pointer"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">Eski Kullanıcıları Göster</span>
+            </label>
+
+            {/* Export button */}
+            <button
+              onClick={handleExport}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium transition-colors flex-shrink-0"
+            >
+              <Download className="w-4 h-4" />
+              <span>Dışa Aktar</span>
+            </button>
 
             {/* Import button */}
             <button

@@ -19,6 +19,7 @@ interface FindAllOptions {
   sortDir?: 'ASC' | 'DESC';
   noCard?: boolean;
   duplicateCards?: boolean;
+  activeOnly?: boolean;
 }
 
 export interface PaginatedResult<T> {
@@ -40,7 +41,7 @@ export class PersonnelService {
   ) {}
 
   async findAll(options: FindAllOptions = {}): Promise<PaginatedResult<any>> {
-    const { search, department, page = 1, limit = 20, sortBy, sortDir = 'DESC', noCard, duplicateCards } = options;
+    const { search, department, page = 1, limit = 20, sortBy, sortDir = 'DESC', noCard, duplicateCards, activeOnly } = options;
 
     const qb = this.personnelRepository.createQueryBuilder('p');
 
@@ -55,6 +56,10 @@ export class PersonnelService {
       qb.andWhere('LOWER(p.department) LIKE LOWER(:department)', {
         department: `%${department}%`,
       });
+    }
+
+    if (activeOnly) {
+      qb.andWhere('p.isActive = :active', { active: true });
     }
 
     if (noCard) {
@@ -268,6 +273,27 @@ export class PersonnelService {
         totalEntries,
       },
     };
+  }
+
+  async exportCsv(): Promise<string> {
+    const all = await this.personnelRepository.find({
+      select: ['firstName', 'lastName', 'cardNumber', 'username', 'department', 'isActive'],
+      order: { firstName: 'ASC', lastName: 'ASC' },
+    });
+
+    const esc = (v: string | null | undefined) => {
+      if (v == null) return '';
+      const s = String(v);
+      return s.includes(';') || s.includes('"') || s.includes('\n')
+        ? `"${s.replace(/"/g, '""')}"`
+        : s;
+    };
+
+    const header = 'Ad;Soyad;KartNo;KullaniciAdi;Departman;Aktif';
+    const rows = all.map((p) =>
+      [esc(p.firstName), esc(p.lastName), esc(p.cardNumber), esc(p.username), esc(p.department), p.isActive ? 'Aktif' : 'Pasif'].join(';'),
+    );
+    return [header, ...rows].join('\r\n');
   }
 
   async importBulk(
