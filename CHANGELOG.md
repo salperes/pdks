@@ -324,3 +324,22 @@ Rev. Report: (
   Değişen frontend: 1 (Settings/index.tsx)
 )
 ---------------------------------------------------------
+Rev. ID    : 037
+Rev. Date  : 21.03.2026
+Rev. Time  : 14:10:00
+Rev. Prompt: Portal sync endpoint duzeltme — /api/users/sync yerine /api/users?limit=1000
+
+Rev. Report: (
+  Portal'da /api/users/sync endpointi uretim ortaminda NestJS route cakismasi
+  nedeniyle 400 hatasi veriyordu (sync string'i /:id parametresiyle eslesiyor).
+  PDKS, Portal'in paginated /api/users?limit=1000 endpoint'ini kullanacak sekilde guncellendi.
+
+  BACKEND — portal-sync.service.ts:
+  - fetchPortalUsers() private metodu eklendi:
+    . URL: {portalApiUrl}/api/users?limit=1000
+    . Response: {users: PortalUser[], total, page, limit} wrapper'indan users[] ayiklaniyor
+  - testConnection() ve syncNow() fetchPortalUsers() kullanacak sekilde refactor edildi
+
+  Degisen dosyalar: 1 (portal-sync.service.ts)
+)
+---------------------------------------------------------

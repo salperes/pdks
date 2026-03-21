@@ -39,6 +39,18 @@ export class PortalSyncService {
     };
   }
 
+  private async fetchPortalUsers(apiUrl: string, apiKey: string, timeoutMs: number): Promise<PortalUser[]> {
+    const base = apiUrl.replace(/\/$/, '');
+    const url = `${base}/api/users?limit=1000`;
+    const res = await fetch(url, {
+      headers: { 'X-API-Key': apiKey },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const data: { users: PortalUser[] } = await res.json();
+    return data.users ?? [];
+  }
+
   async testConnection(): Promise<{ success: boolean; userCount?: number; error?: string }> {
     const settings = await this.getSettings();
     if (!settings?.portalApiUrl || !settings?.portalApiKey) {
@@ -46,17 +58,7 @@ export class PortalSyncService {
     }
 
     try {
-      const url = `${settings.portalApiUrl.replace(/\/$/, '')}/api/users/sync`;
-      const res = await fetch(url, {
-        headers: { 'X-API-Key': settings.portalApiKey },
-        signal: AbortSignal.timeout(10_000),
-      });
-
-      if (!res.ok) {
-        return { success: false, error: `HTTP ${res.status}: ${res.statusText}` };
-      }
-
-      const users: PortalUser[] = await res.json();
+      const users = await this.fetchPortalUsers(settings.portalApiUrl, settings.portalApiKey, 10_000);
       return { success: true, userCount: users.length };
     } catch (err: any) {
       return { success: false, error: err?.message ?? 'Bağlantı hatası' };
@@ -75,17 +77,7 @@ export class PortalSyncService {
 
     let users: PortalUser[];
     try {
-      const url = `${settings.portalApiUrl.replace(/\/$/, '')}/api/users/sync`;
-      const res = await fetch(url, {
-        headers: { 'X-API-Key': settings.portalApiKey },
-        signal: AbortSignal.timeout(15_000),
-      });
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      }
-
-      users = await res.json();
+      users = await this.fetchPortalUsers(settings.portalApiUrl, settings.portalApiKey, 15_000);
     } catch (err: any) {
       const msg = err?.message ?? 'Bilinmeyen hata';
       this.logger.error(`[PortalSync] Portal API hatası: ${msg}`);
