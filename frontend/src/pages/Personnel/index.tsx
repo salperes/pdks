@@ -743,8 +743,11 @@ export const PersonnelPage = () => {
                 >
                   <span className="inline-flex items-center gap-1">Kart No <SortIcon col="cardNumber" /></span>
                 </th>
-                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 hidden md:table-cell">
-                  Kullanıcı Adı
+                <th
+                  className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 hidden md:table-cell cursor-pointer select-none hover:text-[#0078d4] dark:hover:text-[#4da3f5] transition-colors"
+                  onClick={() => handleSort('username')}
+                >
+                  <span className="inline-flex items-center gap-1">Kullanıcı Adı <SortIcon col="username" /></span>
                 </th>
                 <th
                   className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 hidden md:table-cell cursor-pointer select-none hover:text-[#0078d4] dark:hover:text-[#4da3f5] transition-colors"
@@ -752,8 +755,11 @@ export const PersonnelPage = () => {
                 >
                   <span className="inline-flex items-center gap-1">Departman <SortIcon col="department" /></span>
                 </th>
-                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 hidden lg:table-cell">
-                  Son Giriş
+                <th
+                  className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 hidden lg:table-cell cursor-pointer select-none hover:text-[#0078d4] dark:hover:text-[#4da3f5] transition-colors"
+                  onClick={() => handleSort('lastAccessTime')}
+                >
+                  <span className="inline-flex items-center gap-1">Son Giriş <SortIcon col="lastAccessTime" /></span>
                 </th>
                 <th
                   className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 cursor-pointer select-none hover:text-[#0078d4] dark:hover:text-[#4da3f5] transition-colors"

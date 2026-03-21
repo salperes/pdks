@@ -78,9 +78,25 @@ export class PersonnelService {
       department: 'p.department',
       isActive: 'p.isActive',
       createdAt: 'p.createdAt',
+      username: 'p.username',
+      lastAccessTime: 'la.lat',
     };
     const orderField = allowedSort[sortBy ?? ''] ?? 'p.createdAt';
     const orderDir = sortDir === 'ASC' ? 'ASC' : 'DESC';
+
+    if (sortBy === 'lastAccessTime') {
+      qb.leftJoin(
+        (sub) =>
+          sub
+            .select('al.personnelId', 'pid')
+            .addSelect('MAX(al.eventTime)', 'lat')
+            .from(AccessLog, 'al')
+            .groupBy('al.personnelId'),
+        'la',
+        'la.pid = p.id',
+      );
+    }
+
     qb.orderBy(orderField, orderDir);
     qb.skip((page - 1) * limit).take(limit);
 

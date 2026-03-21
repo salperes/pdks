@@ -404,3 +404,19 @@ Rev. Report: (
     frontend/Personnel/index.tsx)
 )
 ---------------------------------------------------------
+Rev. ID    : 040
+Rev. Date  : 21.03.2026
+Rev. Time  : 17:30:00
+Rev. Prompt: Personel — Kullanıcı Adı ve Son Giriş kolonlarına da sıralama eklendi
+
+Rev. Report: (
+  BACKEND — personnel.service.ts:
+  - allowedSort haritasına username ve lastAccessTime eklendi
+  - lastAccessTime sıralaması için LEFT JOIN subquery: MAX(event_time) GROUP BY personnel_id
+
+  FRONTEND — Personnel/index.tsx:
+  - "Kullanıcı Adı" ve "Son Giriş" başlıkları tıklanabilir hale getirildi
+
+  Değişen dosyalar: 2 (personnel.service.ts, frontend/Personnel/index.tsx)
+)
+---------------------------------------------------------
