@@ -126,6 +126,7 @@ export class SupervisorService {
       throw new NotFoundException('Personel bulunamadi');
     }
 
+    await this.ensureEmployeeId(personnel);
     const uid = this.resolveUid(personnel);
     const name = `${personnel.firstName} ${personnel.lastName}`.substring(0, 24);
     const cardno = parseInt(personnel.cardNumber ?? '0', 10) || 0;
@@ -348,6 +349,7 @@ export class SupervisorService {
         continue;
       }
       try {
+        await this.ensureEmployeeId(p);
         const uid = this.resolveUid(p);
         validPersonnel.push({
           id: p.id,
@@ -500,17 +502,35 @@ export class SupervisorService {
   }
 
   /**
-   * Resolve UID from personnel employeeId. Must be 1-3000.
+   * Auto-assign a unique employeeId (1-99999) if personnel has none.
+   */
+  private async ensureEmployeeId(personnel: Personnel): Promise<void> {
+    const parsed = parseInt(personnel.employeeId ?? '', 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 99999) return;
+
+    const result = await this.personnelRepo.query(
+      `SELECT COALESCE(MAX(CAST(employee_id AS INTEGER)), 0) AS max_id
+       FROM personnel
+       WHERE employee_id ~ '^[0-9]+$'
+         AND CAST(employee_id AS INTEGER) BETWEEN 1 AND 99999`,
+    );
+    const next = (parseInt(result[0]?.max_id ?? '0') || 0) + 1;
+    if (next > 99999) throw new BadRequestException('employeeId havuzu doldu (max 99999)');
+    personnel.employeeId = String(next);
+    await this.personnelRepo.save(personnel);
+    this.logger.log(`Auto-assigned employeeId=${personnel.employeeId} to "${personnel.firstName} ${personnel.lastName}"`);
+  }
+
+  /**
+   * Resolve UID from personnel employeeId (1-99999).
    */
   private resolveUid(personnel: Personnel): number {
-    if (personnel.employeeId) {
-      const parsed = parseInt(personnel.employeeId, 10);
-      if (!isNaN(parsed) && parsed > 0 && parsed <= 3000) {
-        return parsed;
-      }
+    const parsed = parseInt(personnel.employeeId ?? '', 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 99999) {
+      return parsed;
     }
     throw new BadRequestException(
-      `"${personnel.firstName} ${personnel.lastName}" icin gecerli employeeId yok (1-3000 arasi olmali)`,
+      `"${personnel.firstName} ${personnel.lastName}" icin gecerli employeeId yok (1-99999 arasi olmali)`,
     );
   }
 }

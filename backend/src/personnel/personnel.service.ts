@@ -151,17 +151,34 @@ export class PersonnelService {
     return this.personnelRepository.findOneBy({ cardNumber });
   }
 
+  async nextEmployeeId(): Promise<string> {
+    const result = await this.personnelRepository.query(
+      `SELECT COALESCE(MAX(CAST(employee_id AS INTEGER)), 0) AS max_id
+       FROM personnel
+       WHERE employee_id ~ '^[0-9]+$'
+         AND CAST(employee_id AS INTEGER) BETWEEN 1 AND 99999`,
+    );
+    const next = (parseInt(result[0]?.max_id ?? '0') || 0) + 1;
+    if (next > 99999) throw new ConflictException('employeeId havuzu doldu (max 99999)');
+    return String(next);
+  }
+
   async create(dto: CreatePersonnelDto): Promise<Personnel> {
-    const existing = await this.personnelRepository.findOneBy({
-      cardNumber: dto.cardNumber,
-    });
-    if (existing) {
-      throw new ConflictException(
-        `"${dto.cardNumber}" kart numarası zaten kayıtlı`,
-      );
+    if (dto.cardNumber) {
+      const existing = await this.personnelRepository.findOneBy({
+        cardNumber: dto.cardNumber,
+      });
+      if (existing) {
+        throw new ConflictException(
+          `"${dto.cardNumber}" kart numarası zaten kayıtlı`,
+        );
+      }
     }
 
     const personnel = this.personnelRepository.create(dto);
+    if (!personnel.employeeId) {
+      personnel.employeeId = await this.nextEmployeeId();
+    }
     return this.personnelRepository.save(personnel);
   }
 
@@ -327,6 +344,9 @@ export class PersonnelService {
         }
 
         const personnel = this.personnelRepository.create(rec);
+        if (!personnel.employeeId) {
+          personnel.employeeId = await this.nextEmployeeId();
+        }
         await this.personnelRepository.save(personnel);
         created++;
       } catch (err: any) {

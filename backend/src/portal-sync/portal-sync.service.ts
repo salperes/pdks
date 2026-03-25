@@ -26,6 +26,18 @@ export class PortalSyncService {
     private readonly settingsRepo: Repository<SystemSettings>,
   ) {}
 
+  private async nextEmployeeId(): Promise<string> {
+    const result = await this.personnelRepo.query(
+      `SELECT COALESCE(MAX(CAST(employee_id AS INTEGER)), 0) AS max_id
+       FROM personnel
+       WHERE employee_id ~ '^[0-9]+$'
+         AND CAST(employee_id AS INTEGER) BETWEEN 1 AND 99999`,
+    );
+    const next = (parseInt(result[0]?.max_id ?? '0') || 0) + 1;
+    if (next > 99999) throw new Error('employeeId havuzu doldu (max 99999)');
+    return String(next);
+  }
+
   private async getSettings(): Promise<SystemSettings | null> {
     return this.settingsRepo.findOneBy({ id: 'default' });
   }
@@ -104,6 +116,7 @@ export class PortalSyncService {
         await this.personnelRepo.save(existing);
         updated++;
       } else {
+        const employeeId = await this.nextEmployeeId();
         const personnel = this.personnelRepo.create({
           username: user.adUsername,
           firstName: firstName || user.adUsername,
@@ -114,6 +127,7 @@ export class PortalSyncService {
           phone: user.phone ?? undefined,
           isActive: user.isActive,
           cardNumber: null,
+          employeeId: employeeId,
         });
         await this.personnelRepo.save(personnel);
         created++;

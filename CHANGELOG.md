@@ -191,6 +191,35 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 049
+Rev. Date  : 25.03.2026
+Rev. Time  : 16:30:00
+Rev. Prompt: employeeId otomatik atama (1-99999); create, importBulk, portal sync, supervisor assign
+
+Rev. Report: (
+  employeeId boş olan personel için MAX+1 stratejisiyle 1-99999 arasında
+  unique ID otomatik atanıyor. Misafir kart aralığı dahil.
+
+  BACKEND — personnel.service.ts:
+  - nextEmployeeId(): MAX(employee_id)+1, 1-99999 arasında
+  - create(): employeeId yoksa otomatik ata
+  - importBulk(): her yeni kayıt için employeeId yoksa otomatik ata
+  - create() null cardNumber için conflict check atlanır
+
+  BACKEND — portal-sync.service.ts:
+  - nextEmployeeId(): aynı MAX+1 sorgusu
+  - Yeni personnel oluşturulurken employeeId otomatik atanıyor
+
+  BACKEND — supervisor.service.ts:
+  - ensureEmployeeId(): employeeId yoksa MAX+1 ata ve kaydet
+  - resolveUid(): limit 3000 → 99999
+  - assign(): ensureEmployeeId() çağrısı eklendi
+  - bulkAssign(): ensureEmployeeId() çağrısı eklendi
+
+  Değişen dosyalar: 3 (personnel.service.ts, portal-sync.service.ts,
+    supervisor.service.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 048
 Rev. Date  : 25.03.2026
 Rev. Time  : 16:00:00
