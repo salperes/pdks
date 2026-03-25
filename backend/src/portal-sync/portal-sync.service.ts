@@ -31,7 +31,7 @@ export class PortalSyncService {
   }
 
   private splitDisplayName(displayName: string): { firstName: string; lastName: string } {
-    const idx = displayName.indexOf(' ');
+    const idx = displayName.lastIndexOf(' ');
     if (idx === -1) return { firstName: displayName, lastName: '' };
     return {
       firstName: displayName.substring(0, idx),

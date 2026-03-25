@@ -191,6 +191,22 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 047
+Rev. Date  : 25.03.2026
+Rev. Time  : 15:30:00
+Rev. Prompt: Portal senkronizasyon — displayName son boşlukta bölünsün (ad, soyad)
+
+Rev. Report: (
+  Portal'dan gelen displayName alanı ilk boşlukta bölününce "S. Alper ES" gibi
+  isimlerde "S." firstName, "Alper ES" lastName oluyordu.
+  Son boşlukta bölünerek "S. Alper" firstName, "ES" lastName doğru atanır.
+
+  BACKEND — portal-sync.service.ts:
+  - splitDisplayName(): indexOf(' ') → lastIndexOf(' ')
+
+  Değişen dosyalar: 1 (backend/src/portal-sync/portal-sync.service.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 046
 Rev. Date  : 25.03.2026
 Rev. Time  : 15:15:00
