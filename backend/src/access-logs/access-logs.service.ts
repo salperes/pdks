@@ -63,7 +63,7 @@ export class AccessLogsService {
       qb.andWhere('log.eventTime >= :startDate', { startDate });
     }
     if (endDate) {
-      qb.andWhere('log.eventTime <= :endDate', { endDate });
+      qb.andWhere('log.eventTime <= :endDate', { endDate: endDate + ' 23:59:59' });
     }
     if (direction) {
       qb.andWhere('log.direction = :direction', { direction });

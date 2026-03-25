@@ -174,3 +174,20 @@ Rev. Report: (
   Değişen dosyalar: 1 (frontend/AccessLogs/index.tsx)
 )
 ---------------------------------------------------------
+Rev. ID    : 045
+Rev. Date  : 25.03.2026
+Rev. Time  : 15:00:00
+Rev. Prompt: Geçiş kayıtları — endDate inclusive düzeltme (bugünün kayıtları görünsün)
+
+Rev. Report: (
+  endDate filtresi '2026-03-25' string'i olarak gönderilince PostgreSQL bunu
+  '2026-03-25 00:00:00' olarak yorumluyordu; gün içindeki kayıtlar dışarıda kalıyordu.
+  Backend'de endDate değerine ' 23:59:59' eklenerek gün sonu dahil edildi.
+  Bu fix hem findAll hem de export endpoint'ini kapsıyor (aynı applyFilters kullanılıyor).
+
+  BACKEND — access-logs.service.ts:
+  - applyFilters(): endDate <= :endDate → endDate + ' 23:59:59'
+
+  Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
+)
+---------------------------------------------------------
