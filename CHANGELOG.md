@@ -191,6 +191,25 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 048
+Rev. Date  : 25.03.2026
+Rev. Time  : 16:00:00
+Rev. Prompt: Erişim yönetimi — atama hatası mesajı backend'den gösterilsin
+
+Rev. Report: (
+  Cihaz atama işleminde "işlem sırasında hata oluştu" yerine backend'in
+  gönderdiği hata mesajı (örn: "Emre CAN icin gecerli employeeId yok")
+  toast'ta gösterilecek.
+
+  FRONTEND — Supervisor/index.tsx:
+  - handleAssignDevices catch: err?.response?.data?.message fallback ile
+  - handleAssignLocation catch: aynı pattern
+  - handleBulkAssignLocation catch: aynı pattern
+  - handleMatrixCellClick catch: aynı pattern
+
+  Değişen dosyalar: 1 (frontend/src/pages/Supervisor/index.tsx)
+)
+---------------------------------------------------------
 Rev. ID    : 047
 Rev. Date  : 25.03.2026
 Rev. Time  : 15:30:00

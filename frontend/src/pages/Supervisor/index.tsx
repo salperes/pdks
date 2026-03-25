@@ -430,8 +430,8 @@ export const SupervisorPage = () => {
       if (selectedPersonnelId && !isBulkMode) {
         await fetchAssignments(selectedPersonnelId);
       }
-    } catch {
-      addToast('İşlem sırasında hata oluştu.', 'error');
+    } catch (err: any) {
+      addToast(err?.response?.data?.message ?? 'İşlem sırasında hata oluştu.', 'error');
     } finally {
       setAssigning(false);
     }
@@ -456,8 +456,8 @@ export const SupervisorPage = () => {
       if (ok > 0) addToast(`Lokasyondaki ${ok} cihaza başarıyla atandı.`, 'success');
       if (fail > 0) addToast(`${fail} cihaza atama başarısız.`, 'error');
       await Promise.all([fetchAssignments(selectedPersonnelId), fetchMatrix()]);
-    } catch {
-      addToast('Lokasyon atama sırasında hata oluştu.', 'error');
+    } catch (err: any) {
+      addToast(err?.response?.data?.message ?? 'Lokasyon atama sırasında hata oluştu.', 'error');
     } finally {
       setAssigningLocation(false);
     }
@@ -486,8 +486,8 @@ export const SupervisorPage = () => {
       if (totalOk > 0) addToast(`${checkedPersonnelIds.size} personel için ${totalOk} atama başarılı.`, 'success');
       if (totalFail > 0) addToast(`${totalFail} atama başarısız.`, 'error');
       await fetchMatrix();
-    } catch {
-      addToast('Toplu lokasyon atama sırasında hata oluştu.', 'error');
+    } catch (err: any) {
+      addToast(err?.response?.data?.message ?? 'Toplu lokasyon atama sırasında hata oluştu.', 'error');
     } finally {
       setBulkAssigningLocation(false);
     }
@@ -570,8 +570,8 @@ export const SupervisorPage = () => {
       if (personnelId === selectedPersonnelId) {
         await fetchAssignments(personnelId);
       }
-    } catch {
-      addToast('İşlem sırasında hata oluştu.', 'error');
+    } catch (err: any) {
+      addToast(err?.response?.data?.message ?? 'İşlem sırasında hata oluştu.', 'error');
     } finally {
       setMatrixBusy((prev) => {
         const next = new Set(prev);
