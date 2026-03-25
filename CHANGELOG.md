@@ -157,3 +157,20 @@ Rev. Report: (
   Değişen dosyalar: 1 (frontend/AccessLogs/index.tsx)
 )
 ---------------------------------------------------------
+Rev. ID    : 044
+Rev. Date  : 25.03.2026
+Rev. Time  : 14:45:00
+Rev. Prompt: Geçiş kayıtları — varsayılan filtre düzeltme: endDate=bugün (geçmişe yönelik)
+
+Rev. Report: (
+  Rev 043'te startDate=bugün olarak ayarlanan default filtre yanlış yönde çalışıyordu
+  (bugünden itibaren ileri = 2027 gibi hatalı saat kayıtları görünüyordu).
+  Doğru mantık: endDate=bugün → DB'nin ilk kaydından bugüne kadar göster,
+  gelecek tarihli hatalı saat kayıtlarını filtreler.
+
+  FRONTEND — AccessLogs/index.tsx:
+  - todayFilters(): startDate → endDate (tek satır değişiklik)
+
+  Değişen dosyalar: 1 (frontend/AccessLogs/index.tsx)
+)
+---------------------------------------------------------

@@ -45,7 +45,7 @@ const emptyFilters: Filters = {
 
 const todayFilters = (): Filters => ({
   ...emptyFilters,
-  startDate: new Date().toISOString().split('T')[0],
+  endDate: new Date().toISOString().split('T')[0],
 });
 
 interface PairedEntry {
