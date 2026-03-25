@@ -136,3 +136,24 @@ Rev. Report: (
   Degisen/yeni dosyalar: 6
 )
 ---------------------------------------------------------
+Rev. ID    : 043
+Rev. Date  : 25.03.2026
+Rev. Time  : 14:30:00
+Rev. Prompt: Geçiş kayıtları — varsayılan filtre bugün, tabloya Kart No kolonu
+
+Rev. Report: (
+  Geçiş Kayıtları sayfasında iki iyileştirme yapıldı.
+
+  FRONTEND — AccessLogs/index.tsx:
+  - todayFilters() yardımcı fonksiyon eklendi: startDate alanını bugünün tarihi
+    (YYYY-MM-DD) olarak döner.
+  - filters ve appliedFilters state'leri todayFilters() ile başlatıldı;
+    böylece sayfa açılışında yalnızca bugünkü kayıtlar listelenir.
+  - "Temizle" butonu da emptyFilters yerine todayFilters() ile sıfırlanır.
+  - Tabloya "Kart No" sütunu eklendi (Personel ile Cihaz arasına);
+    log.personnel?.cardNumber değerini monospace font ile gösterir.
+  - colCount: 5/6 → 6/7 (bulk actions dahil)
+
+  Değişen dosyalar: 1 (frontend/AccessLogs/index.tsx)
+)
+---------------------------------------------------------

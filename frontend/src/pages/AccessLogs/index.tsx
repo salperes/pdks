@@ -43,6 +43,11 @@ const emptyFilters: Filters = {
   search: '',
 };
 
+const todayFilters = (): Filters => ({
+  ...emptyFilters,
+  startDate: new Date().toISOString().split('T')[0],
+});
+
 interface PairedEntry {
   personnelId: string;
   personnelName: string;
@@ -118,8 +123,8 @@ export const AccessLogsPage = () => {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('all');
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [filters, setFilters] = useState<Filters>(emptyFilters);
-  const [appliedFilters, setAppliedFilters] = useState<Filters>(emptyFilters);
+  const [filters, setFilters] = useState<Filters>(todayFilters);
+  const [appliedFilters, setAppliedFilters] = useState<Filters>(todayFilters);
   const [exporting, setExporting] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastId = useRef(0);
@@ -337,8 +342,9 @@ export const AccessLogsPage = () => {
   };
 
   const handleClearFilters = () => {
-    setFilters(emptyFilters);
-    setAppliedFilters(emptyFilters);
+    const t = todayFilters();
+    setFilters(t);
+    setAppliedFilters(t);
     setPage(1);
   };
 
@@ -375,7 +381,7 @@ export const AccessLogsPage = () => {
         : 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
     }`;
 
-  const colCount = showBulkActions ? 6 : 5;
+  const colCount = showBulkActions ? 7 : 6;
 
   // ---- Render ----
   return (
@@ -805,6 +811,9 @@ export const AccessLogsPage = () => {
                     Personel
                   </th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Kart No
+                  </th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Cihaz
                   </th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -871,6 +880,9 @@ export const AccessLogsPage = () => {
                         >
                           {getPersonnelDisplay(log)}
                         </span>
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400 font-mono">
+                        {log.personnel?.cardNumber ?? '-'}
                       </td>
                       <td className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300">
                         {log.device?.name ?? '-'}
