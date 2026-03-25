@@ -191,3 +191,22 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 046
+Rev. Date  : 25.03.2026
+Rev. Time  : 15:15:00
+Rev. Prompt: Personel güncelleme — mükerrer kart numarası 500 yerine 409 Conflict dönsün
+
+Rev. Report: (
+  PATCH /personnel/:id kart numarası dolu başka bir kayda atanmaya çalışılırsa
+  PostgreSQL unique constraint hatası (23505) backend'de yakalanmıyordu ve 500 dönüyordu.
+  update() metoduna try/catch eklendi; 23505 + card_number ise ConflictException (409) fırlatılıyor.
+  Frontend zaten err?.response?.data?.message ile backend mesajını toast'ta gösteriyor.
+
+  BACKEND — personnel.service.ts:
+  - update(): save() çağrısı try/catch ile sarmalandı
+  - err.code === '23505' && err.detail.includes('card_number') → 409 ConflictException
+    mesaj: "Bu kart numarası başka bir personele atanmış."
+
+  Değişen dosyalar: 1 (backend/personnel/personnel.service.ts)
+)
+---------------------------------------------------------

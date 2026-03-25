@@ -168,7 +168,14 @@ export class PersonnelService {
   async update(id: string, dto: UpdatePersonnelDto): Promise<Personnel> {
     const personnel = await this.findById(id);
     Object.assign(personnel, dto);
-    return this.personnelRepository.save(personnel);
+    try {
+      return await this.personnelRepository.save(personnel);
+    } catch (err: any) {
+      if (err?.code === '23505' && err?.detail?.includes('card_number')) {
+        throw new ConflictException('Bu kart numarası başka bir personele atanmış.');
+      }
+      throw err;
+    }
   }
 
   async remove(id: string): Promise<void> {
