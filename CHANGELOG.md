@@ -191,6 +191,22 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 050
+Rev. Date  : 25.03.2026
+Rev. Time  : 17:00:00
+Rev. Prompt: Portal sync — isActive önceliği: PDKS pasifse portal aktif etmesin
+
+Rev. Report: (
+  Portal sync sırasında PDKS'de pasif yapılan personel, portal aktif gönderince
+  tekrar aktif hale geliyordu. Yeni kural: existing.isActive && user.isActive
+  — PDKS pasif ise pasif kalır; portal pasif gönderirse PDKS'yi de pasif yapar.
+
+  BACKEND — portal-sync.service.ts:
+  - existing.isActive = user.isActive → existing.isActive && user.isActive
+
+  Değişen dosyalar: 1 (backend/src/portal-sync/portal-sync.service.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 049
 Rev. Date  : 25.03.2026
 Rev. Time  : 16:30:00

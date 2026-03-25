@@ -112,7 +112,8 @@ export class PortalSyncService {
         existing.department = user.department ?? existing.department;
         existing.title = user.title ?? existing.title;
         existing.phone = user.phone ?? existing.phone;
-        existing.isActive = user.isActive;
+        // Portal pasif yapabilir; PDKS pasif ise portal aktif etse bile pasif kalır
+        existing.isActive = existing.isActive && user.isActive;
         await this.personnelRepo.save(existing);
         updated++;
       } else {
