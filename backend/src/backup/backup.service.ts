@@ -58,17 +58,29 @@ export class BackupService {
     });
 
     try {
-      const cmd = `PGPASSWORD="${password}" pg_dump -h ${host} -p ${port} -U ${user} -d ${db} -F p -f "${filepath}"`;
-      execSync(cmd, { timeout: 300000 });
+      const cmd = `PGPASSWORD="${password}" pg_dump -h ${host} -p ${port} -U ${user} -d ${db} -F p -f "${filepath}" 2>&1`;
+      const output = execSync(cmd, { timeout: 300000 }).toString();
 
       const stats = fs.statSync(filepath);
+      if (stats.size === 0) {
+        throw new Error(`pg_dump boş dosya üretti: ${output || '(çıktı yok)'}`);
+      }
       entry.size = stats.size;
       entry.status = 'success';
 
       this.logger.log(`Yedekleme tamamlandı: ${filename} (${stats.size} bytes)`);
     } catch (err: any) {
-      entry.errorMessage = err.message?.substring(0, 500) || 'Bilinmeyen hata';
-      this.logger.error(`Yedekleme başarısız: ${err.message}`);
+      // Başarısız yedekte 0-byte dosya bıraktıysa temizle
+      try {
+        if (fs.existsSync(filepath) && fs.statSync(filepath).size === 0) {
+          fs.unlinkSync(filepath);
+        }
+      } catch {
+        /* ignore cleanup error */
+      }
+      const stderr = err.stderr?.toString?.() || err.stdout?.toString?.() || '';
+      entry.errorMessage = (stderr || err.message || 'Bilinmeyen hata').substring(0, 500);
+      this.logger.error(`Yedekleme başarısız: ${entry.errorMessage}`);
     }
 
     return this.backupHistoryRepository.save(entry);

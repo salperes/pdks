@@ -191,6 +191,28 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 052
+Rev. Date  : 21.04.2026
+Rev. Time  : 19:30:00
+Rev. Prompt: Yedekleme 0 byte — pg_dump backend container'ında yok
+
+Rev. Report: (
+  Admin > Sistem > Yedekleme sayfasında oluşturulan yedekler 0 byte ve
+  "Başarısız" durumunda idi. Sebep: backend (node:20-alpine) image'inde
+  pg_dump yüklü değildi; execSync("pg_dump ...") ENOENT ile çöküyordu.
+
+  BACKEND — Dockerfile:
+  - postgresql16-client apk paketi eklendi (pg_dump + pg_restore)
+  - /app/backups dizini mkdir -p ile garanti altına alındı
+
+  BACKEND — backup.service.ts:
+  - pg_dump stderr artık 2>&1 ile yakalanıp errorMessage'a yazılıyor
+  - 0-byte dosya tespit edilirse "boş dosya üretti" hatası fırlatılıyor
+  - Başarısız yedekte 0-byte artık dosya silinir (kirli iz bırakmaz)
+
+  Değişen dosyalar: 2 (backend/Dockerfile, backend/src/backup/backup.service.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 051
 Rev. Date  : 21.04.2026
 Rev. Time  : 19:20:00
