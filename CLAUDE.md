@@ -1,6 +1,6 @@
 # PDKS - Personel Devam Kontrol Sistemi
 
-## Mevcut Versiyon: 1.0.052
+## Mevcut Versiyon: 1.0.053
 
 ## Proje Ozeti
 ZKTeco SC403 kart okuyucu terminallerle entegre personel devam kontrol sistemi.
@@ -57,18 +57,18 @@ TypeORM `synchronize: true` (development). Tablolar otomatik olusur.
 ## ZKTeco Cihazlar (5 adet SC403, firmware Ver 6.60)
 | Cihaz | IP (guncel) | Seri No | CommPassword | comm_type | Durum |
 |-------|------------|---------|--------------|-----------|-------|
-| Fabrika 1 | 192.168.204.233 | AJ8O223760445 | (yok) | 3 (ADMS) | UDP calisiyor, 92 user, 1 log |
-| Fabrika 2 | 192.168.152.233 | AJ8O223760433 | (yok) | 3 (ADMS) | UDP calisiyor (prod'dan erisim var) |
-| Merkez Ofis | 192.168.104.242 | 6079214600262 | 202212 | 3 (ADMS) | UDP calisiyor (prod'dan CommKey auth basarili) |
-| Optik Oda | 192.168.104.241 | 6079214600523 | 202212 | 3 (ADMS) | UDP calisiyor (prod'dan CommKey auth basarili) |
-| 4.Ar-Ge Arka Kapi | 192.168.107.240 | AJ8O203360369 | 202212 | 3 (ADMS) | Erisim disi (ping yok) |
+| Fabrika 1 | 192.168.255.9 | AJ8O223760445 | (yok) | 3 (ADMS) | UDP, sync aktif |
+| Fabrika 2 | 192.168.155.9 | AJ8O223760433 | (yok) | 3 (ADMS) | UDP, sync aktif |
+| Merkez Ofis | 192.168.105.9 | 6079214600262 | 202212 | 3 (ADMS) | UDP + CommKey, sync aktif |
+| Optik Oda | 192.168.105.8 | 6079214600523 | 202212 | 3 (ADMS) | UDP + CommKey, sync aktif |
+| 4.Ar-Ge Arka Kapi | 192.168.113.9 | AJ8O203360369 | 202212 | 3 (ADMS) | UDP + CommKey, sync aktif |
 
 ### Cihaz Iletisim Modlari
 - **comm_type=3 = ADMS push modu**: Cihazlar HTTP ile sunucuya baglanir (sunucu cihaza degil!)
   - Cihaz → `GET /iclock/cdata?SN=...` (config ister)
   - Cihaz → `POST /iclock/cdata?SN=...&table=ATTLOG` (log gonderir)
   - Cihaz → `GET /iclock/getrequest?SN=...` (komut bekler)
-- **UDP 4370**: Fabrika 2 calisiyor. Merkez Ofis/Optik Oda CMD_ACK_UNAUTH (2005).
+- **UDP 4370**: Tum cihazlar calisiyor (CommKey gerekenlerde auth basarili).
 - **TCP 4370**: Dev makineden KAPALI, VM'den (192.168.88.240) ACIK.
 - **ADMS modulu**: `backend/src/adms/` - ADMS push server endpoint'leri
 - `zkteco-client.service.ts` CMD_AUTH (1102) destegi mevcut (UDP fallback icin).

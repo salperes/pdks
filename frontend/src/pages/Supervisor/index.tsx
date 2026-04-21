@@ -76,7 +76,7 @@ interface BulkPersonnelResult {
 interface Toast {
   id: number;
   message: string;
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'info';
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ const ToastContainer = ({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
       <div
         key={t.id}
         className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all ${
-          t.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'
+          t.type === 'success' ? 'bg-emerald-600' : t.type === 'info' ? 'bg-blue-600' : 'bg-red-600'
         }`}
       >
         <span className="flex-1">{t.message}</span>
@@ -183,7 +183,7 @@ export const SupervisorPage = () => {
   // Helpers
   // ----------------------------------
 
-  const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+  const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = ++toastId.current;
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
@@ -540,38 +540,73 @@ export const SupervisorPage = () => {
     if (matrixBusy.has(key)) return;
 
     const currentStatus = getMatrixStatus(personnelId, deviceId);
+    const isRemove = currentStatus === 'enrolled' || currentStatus === 'pending';
+
+    const p = matrix?.personnel.find((x) => x.id === personnelId);
+    const d = matrix?.devices.find((x) => x.id === deviceId);
+    const personnelName = p ? `${p.firstName} ${p.lastName}` : 'Personel';
+    const deviceName = d?.name ?? 'Cihaz';
+    const pair = `${personnelName} → ${deviceName}`;
+
+    // Optimistic matris güncellemesi: API sonucu beklemeden hücre durumunu değiştir
+    setMatrix((prev) => {
+      if (!prev) return prev;
+      if (isRemove) {
+        return {
+          ...prev,
+          assignments: prev.assignments.filter(
+            (a) => !(a.personnelId === personnelId && a.deviceId === deviceId),
+          ),
+        };
+      }
+      const existing = prev.assignments.find(
+        (a) => a.personnelId === personnelId && a.deviceId === deviceId,
+      );
+      if (existing) {
+        return {
+          ...prev,
+          assignments: prev.assignments.map((a) =>
+            a.personnelId === personnelId && a.deviceId === deviceId
+              ? { ...a, status: 'pending' }
+              : a,
+          ),
+        };
+      }
+      return {
+        ...prev,
+        assignments: [...prev.assignments, { personnelId, deviceId, status: 'pending' }],
+      };
+    });
 
     setMatrixBusy((prev) => new Set(prev).add(key));
+    addToast(`${pair}: ${isRemove ? 'Kaldırılıyor…' : 'Atanıyor…'}`, 'info');
+
     try {
-      if (currentStatus === 'enrolled' || currentStatus === 'pending') {
-        const res = await api.post('/supervisor/unassign', {
-          personnelId,
-          deviceIds: [deviceId],
-        });
-        const results: AssignResult[] = res.data?.results ?? [];
-        if (results[0]?.success) {
-          addToast(`${results[0].deviceName}: Kaldırıldı.`, 'success');
-        } else {
-          addToast(`Kaldırma başarısız: ${results[0]?.error ?? ''}`, 'error');
-        }
+      const url = isRemove ? '/supervisor/unassign' : '/supervisor/assign';
+      const res = await api.post(url, { personnelId, deviceIds: [deviceId] });
+      const results: AssignResult[] = res.data?.results ?? [];
+      const ok = results[0]?.success;
+      if (ok) {
+        addToast(`${pair}: ${isRemove ? 'Kaldırıldı.' : 'Atandı.'}`, 'success');
       } else {
-        const res = await api.post('/supervisor/assign', {
-          personnelId,
-          deviceIds: [deviceId],
-        });
-        const results: AssignResult[] = res.data?.results ?? [];
-        if (results[0]?.success) {
-          addToast(`${results[0].deviceName}: Atandı.`, 'success');
-        } else {
-          addToast(`Atama başarısız: ${results[0]?.error ?? ''}`, 'error');
-        }
+        const err = results[0]?.error ?? 'bilinmeyen hata';
+        addToast(
+          `${isRemove ? 'Kaldırma' : 'Atama'} başarısız (${pair}): ${err}`,
+          'error',
+        );
       }
       await fetchMatrix();
       if (personnelId === selectedPersonnelId) {
         await fetchAssignments(personnelId);
       }
     } catch (err: any) {
-      addToast(err?.response?.data?.message ?? 'İşlem sırasında hata oluştu.', 'error');
+      addToast(
+        `${isRemove ? 'Kaldırma' : 'Atama'} başarısız (${pair}): ${
+          err?.response?.data?.message ?? 'İşlem sırasında hata oluştu.'
+        }`,
+        'error',
+      );
+      await fetchMatrix(); // rollback — gerçek durumu geri çek
     } finally {
       setMatrixBusy((prev) => {
         const next = new Set(prev);

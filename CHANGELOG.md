@@ -191,6 +191,41 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 053
+Rev. Date  : 21.04.2026
+Rev. Time  : 22:04:00
+Rev. Prompt: Matris UX: optimistic update + net toast; CLAUDE.md cihaz IP'leri
+
+Rev. Report: (
+  Erişim Yönetimi matris görünümünde enrolled hücreye tıklayan kullanıcı
+  "atamak istediğinde" toggle mantığı sessizce /unassign çağırıyor ve sonuç
+  toast'u "{cihaz}: Kaldırıldı" olduğu için "atama başarısız" olarak
+  algılanıyordu. Ayrıca CLAUDE.md'deki cihaz IP tablosu prod'daki gerçek
+  değerlerle eşleşmiyordu.
+
+  FRONTEND — Supervisor/index.tsx (matris UX):
+  - Toast tipine 'info' (mavi) eklendi; ToastContainer renk koşulu güncellendi
+  - addToast imzası 'success' | 'error' | 'info' default 'success'
+  - handleMatrixCellClick:
+    • Optimistic matris güncellemesi (setMatrix ile assignment anında değişir)
+    • Tıklama anında info toast: "{Ad Soyad} → {Cihaz}: Kaldırılıyor…/Atanıyor…"
+    • Sonuç toast'ı: "{Ad Soyad} → {Cihaz}: Kaldırıldı./Atandı."
+    • Hata toast'ı: "Kaldırma/Atama başarısız ({pair}): {err}"
+    • Hata durumunda fetchMatrix ile rollback
+
+  CLAUDE.md:
+  - Cihaz IP tablosu prod DB ile eşleştirildi:
+    * Fabrika 1       192.168.204.233 → 192.168.255.9
+    * Fabrika 2       192.168.152.233 → 192.168.155.9
+    * Merkez Ofis     192.168.104.242 → 192.168.105.9
+    * Optik Oda       192.168.104.241 → 192.168.105.8
+    * 4.Ar-Ge Arka K. 192.168.107.240 → 192.168.113.9
+  - "UDP 4370" notu: tüm cihazlar çalışıyor (önceki durum: sadece Fabrika 2)
+  - 4.Ar-Ge durumu "Erisim disi" → "UDP + CommKey, sync aktif"
+
+  Değişen dosyalar: 4 (Supervisor/index.tsx, CLAUDE.md, CHANGELOG.md, version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 052
 Rev. Date  : 21.04.2026
 Rev. Time  : 19:30:00
