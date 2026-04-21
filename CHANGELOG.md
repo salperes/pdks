@@ -191,6 +191,72 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 051
+Rev. Date  : 21.04.2026
+Rev. Time  : 19:20:00
+Rev. Prompt: Giriş/Çıkış türev hesaplama — cihazlar tek yönlü, gündeki ilk kayıt giriş, son kayıt çıkış
+
+Rev. Report: (
+  Cihazlar hem giriş hem çıkışta aynı. "direction" artık kayıt anında değil,
+  sorgulama anında türetiliyor: personel başına gündeki (TR 00:00-23:59) ilk
+  kart okuması = giriş, son = çıkış, aradakiler = ara geçiş.
+
+  BACKEND — Yazma tarafı (direction artık null):
+  - device-comm/sync.service.ts → direction yazımı kaldırıldı
+  - adms/adms.service.ts        → direction yazımı kaldırıldı
+
+  BACKEND — Entity:
+  - entities/access-log.entity.ts → @Index(['personnelId', 'eventTime'])
+
+  BACKEND — access-logs.service.ts:
+  - derivedDirectionCase(): WHERE filtresi için CASE deseni
+  - attachDerivedDirections(): sayfa logları için min/max toplu sorgu + etiket
+  - findAll / findForExport / findUnknown → derivedDirection alanı eklendi
+  - findPaired() → 'paired' modu kaldırıldı, ilk/son event üzerinden süre
+  - getPersonnelCountByLocation() → bugünkü son tap lokasyonu
+  - checkNotifications() → direction==='in' geç kalma bloğu devre dışı
+    (izin/görev modülüyle birlikte yeniden ele alınacak)
+
+  BACKEND — DTO:
+  - query-access-logs.dto.ts → direction enum 'in'|'out'|'transit',
+    includeTransit boolean eklendi
+
+  BACKEND — dashboard.service.ts:
+  - todayArrived = bugün en az 1 kaydı olan personel sayısı
+  - currentlyInside = bugünkü kayıt sayısı tek olan (turnike varsayımı)
+  - getHourlyStats → CTE + CASE ile türev in/out histogramı
+
+  BACKEND — reports.service.ts:
+  - calcPairedMinutes() kaldırıldı
+  - processDayLogs → ilk/son event'e göre
+  - resolveConfigForLogs → ilk logun lokasyonu
+
+  BACKEND — query.service.ts, personnel.service.ts:
+  - Tüm "direction" SQL referansları türev CASE ifadesiyle değiştirildi
+  - lastDirection → son log için türev yön
+
+  FRONTEND — AccessLogs (pages/AccessLogs/index.tsx):
+  - DirectionBadge 'transit' (gri, ↔) eklendi
+  - Filtre dropdown'a "Ara" seçeneği
+  - Tablo rendir → log.derivedDirection ?? log.direction
+  - Excel export Giriş/Çıkış/Ara
+
+  FRONTEND — types/index.ts:
+  - AccessLog.direction tipi 'in'|'out'|'transit'|null
+  - AccessLog.derivedDirection eklendi
+  - Personnel.lastDirection tipi genişletildi
+
+  NOT: DB'deki eski "direction" kolonu korundu (destructive değişiklik yok);
+  hiçbir kod yolu artık o kolonu okumuyor. Eski kayıtlar da türev modelle
+  yeniden yorumlanıyor.
+
+  Değişen dosyalar: 12
+  Backend: 10 (sync.service.ts, adms.service.ts, access-log.entity.ts,
+    access-logs.service.ts, query-access-logs.dto.ts, dashboard.service.ts,
+    reports.service.ts, query.service.ts, personnel.service.ts)
+  Frontend: 2 (AccessLogs/index.tsx, types/index.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 050
 Rev. Date  : 25.03.2026
 Rev. Time  : 17:00:00

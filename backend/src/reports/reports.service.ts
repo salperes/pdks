@@ -94,63 +94,47 @@ interface DayResult {
   punchCount: number;
 }
 
-/** Paired (net) calculation: match each IN with the next OUT, sum durations */
-function calcPairedMinutes(logs: AccessLog[]): number {
-  const sorted = [...logs].sort(
-    (a, b) => new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime(),
-  );
-  let total = 0;
-  let openIn: Date | null = null;
-  for (const log of sorted) {
-    if (log.direction === 'in') {
-      if (!openIn) openIn = new Date(log.eventTime);
-    } else if (log.direction === 'out' && openIn) {
-      const outTime = new Date(log.eventTime);
-      if (outTime > openIn) {
-        total += (outTime.getTime() - openIn.getTime()) / 60000;
-      }
-      openIn = null;
-    }
-  }
-  return total;
-}
-
+/**
+ * Türev yön modeli: girişi olan günlerde ilk kayıt = giriş, son kayıt = çıkış,
+ * aradakiler ara geçiştir. Logların event_time'a göre sıralı geldiği varsayılır.
+ */
 function processDayLogs(logs: AccessLog[], cfg: WorkConfig): DayResult {
-  const inLogs = logs.filter((l) => l.direction === 'in');
-  const outLogs = logs.filter((l) => l.direction === 'out');
+  if (logs.length === 0) {
+    return {
+      firstIn: null,
+      lastOut: null,
+      totalMinutes: 0,
+      isLate: false,
+      isEarly: false,
+      punchCount: 0,
+    };
+  }
 
-  const firstIn =
-    inLogs.length > 0 ? new Date(inLogs[0].eventTime) : null;
-  const lastOut =
-    outLogs.length > 0 ? new Date(outLogs[outLogs.length - 1].eventTime) : null;
+  const firstIn = new Date(logs[0].eventTime);
+  const lastOut = logs.length > 1 ? new Date(logs[logs.length - 1].eventTime) : null;
 
   let totalMinutes = 0;
-  if (cfg.calculationMode === 'paired') {
-    totalMinutes = calcPairedMinutes(logs);
-  } else {
-    if (firstIn && lastOut && lastOut > firstIn) {
-      totalMinutes = (lastOut.getTime() - firstIn.getTime()) / 60000;
-    }
+  if (firstIn && lastOut && lastOut > firstIn) {
+    totalMinutes = (lastOut.getTime() - firstIn.getTime()) / 60000;
   }
 
   return {
     firstIn,
     lastOut,
     totalMinutes,
-    isLate: firstIn ? isLate(firstIn, cfg) : false,
+    isLate: isLate(firstIn, cfg),
     isEarly: lastOut ? isEarly(lastOut, cfg, firstIn) : false,
     punchCount: logs.length,
   };
 }
 
-/** Resolve work config for a person's day logs based on first entry location */
+/** Günlük logların ilk kaydının lokasyonuna göre work config seç. */
 function resolveConfigForLogs(
   logs: AccessLog[],
   locationConfigs: Map<string, WorkConfig>,
   globalCfg: WorkConfig,
 ): WorkConfig {
-  const firstIn = logs.find((l) => l.direction === 'in');
-  const locId = firstIn?.locationId;
+  const locId = logs[0]?.locationId;
   if (locId && locationConfigs.has(locId)) {
     return locationConfigs.get(locId)!;
   }

@@ -19,7 +19,6 @@ interface CreateLogData {
   deviceId: string;
   locationId?: string;
   eventTime: Date;
-  direction?: string;
   source?: string;
   deviceUserId?: number;
   rawData?: Record<string, any>;
@@ -30,6 +29,11 @@ interface LocationOccupancy {
   locationName: string;
   count: number;
 }
+
+type DerivedDirection = 'in' | 'out' | 'transit' | null;
+
+// Postgres Europe/Istanbul günü (vardiya yok; gelecekte lokasyon bazlı TZ'ye geçilebilir)
+const DAY_TZ = 'Europe/Istanbul';
 
 @Injectable()
 export class AccessLogsService {
@@ -43,6 +47,26 @@ export class AccessLogsService {
     private readonly settingsService: SettingsService,
     private readonly notificationsService: NotificationsService,
   ) {}
+
+  // SQL WHERE parçası: derive edilmiş yöne göre filtre
+  private derivedDirectionCase(): string {
+    return `(CASE
+      WHEN log.personnel_id IS NULL THEN NULL
+      WHEN log.event_time = (
+        SELECT MIN(sub.event_time) FROM access_logs sub
+        WHERE sub.personnel_id = log.personnel_id
+          AND date_trunc('day', sub.event_time AT TIME ZONE '${DAY_TZ}')
+            = date_trunc('day', log.event_time AT TIME ZONE '${DAY_TZ}')
+      ) THEN 'in'
+      WHEN log.event_time = (
+        SELECT MAX(sub.event_time) FROM access_logs sub
+        WHERE sub.personnel_id = log.personnel_id
+          AND date_trunc('day', sub.event_time AT TIME ZONE '${DAY_TZ}')
+            = date_trunc('day', log.event_time AT TIME ZONE '${DAY_TZ}')
+      ) THEN 'out'
+      ELSE 'transit'
+    END)`;
+  }
 
   private applyFilters(
     qb: any,
@@ -66,7 +90,7 @@ export class AccessLogsService {
       qb.andWhere('log.eventTime <= :endDate', { endDate: endDate + ' 23:59:59' });
     }
     if (direction) {
-      qb.andWhere('log.direction = :direction', { direction });
+      qb.andWhere(`${this.derivedDirectionCase()} = :direction`, { direction });
     }
     if (search) {
       qb.andWhere(
@@ -76,6 +100,82 @@ export class AccessLogsService {
           OR LOWER(personnel.employeeId) LIKE LOWER(:search))`,
         { search: `%${search}%` },
       );
+    }
+  }
+
+  /**
+   * Sayfalanmış log listesi için her satıra `derivedDirection` ekler.
+   * (personnelId, gün) gruplarının min/max zamanını tek SQL ile çeker; sayfada
+   * olmayan erken/geç kayıtlar da doğru etiketlenir.
+   */
+  private async attachDerivedDirections(logs: AccessLog[]): Promise<void> {
+    if (logs.length === 0) return;
+
+    // Benzersiz personnelId ve (yerel) gün kümelerini topla
+    const personnelIds = new Set<string>();
+    for (const log of logs) {
+      if (log.personnelId) personnelIds.add(log.personnelId);
+    }
+    if (personnelIds.size === 0) {
+      for (const log of logs) (log as any).derivedDirection = null;
+      return;
+    }
+
+    // İlgili personellerin access loglarından (event_time, personnel_id, gün) bazında min/max
+    // Yalnızca sayfadaki logların tarih aralığını içeren sorgu — sayfadaki hangi günlerin
+    // gerektiğini tam bilmeden güvenli yol: sayfada geçen her personel için, sayfada
+    // görünen günlerin min/max'ı.
+    const dayKeys = new Set<string>(); // 'YYYY-MM-DD' (Europe/Istanbul yerel)
+    const logDay = new Map<string, string>(); // log.id → dayKey
+    for (const log of logs) {
+      if (!log.personnelId) continue;
+      const d = new Date(log.eventTime);
+      // Europe/Istanbul için UTC+3 (DST yok)
+      const local = new Date(d.getTime() + 3 * 3600 * 1000);
+      const dayKey = `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, '0')}-${String(local.getUTCDate()).padStart(2, '0')}`;
+      dayKeys.add(dayKey);
+      logDay.set(log.id, dayKey);
+    }
+
+    const personnelArr = Array.from(personnelIds);
+    const dayArr = Array.from(dayKeys);
+
+    const rows: { personnel_id: string; day: string; min_t: Date; max_t: Date }[] =
+      await this.accessLogsRepository.query(
+        `SELECT personnel_id,
+                to_char(date_trunc('day', event_time AT TIME ZONE $3), 'YYYY-MM-DD') AS day,
+                MIN(event_time) AS min_t,
+                MAX(event_time) AS max_t
+         FROM access_logs
+         WHERE personnel_id = ANY($1::uuid[])
+           AND date_trunc('day', event_time AT TIME ZONE $3) = ANY($2::timestamp[])
+         GROUP BY personnel_id, day`,
+        [personnelArr, dayArr.map((d) => `${d} 00:00:00`), DAY_TZ],
+      );
+
+    const stats = new Map<string, { min: number; max: number }>(); // key: personnelId|day
+    for (const r of rows) {
+      stats.set(`${r.personnel_id}|${r.day}`, {
+        min: new Date(r.min_t).getTime(),
+        max: new Date(r.max_t).getTime(),
+      });
+    }
+
+    for (const log of logs) {
+      if (!log.personnelId) {
+        (log as any).derivedDirection = null;
+        continue;
+      }
+      const dayKey = logDay.get(log.id)!;
+      const s = stats.get(`${log.personnelId}|${dayKey}`);
+      if (!s) {
+        (log as any).derivedDirection = null;
+        continue;
+      }
+      const t = new Date(log.eventTime).getTime();
+      if (t === s.min) (log as any).derivedDirection = 'in';
+      else if (t === s.max) (log as any).derivedDirection = 'out';
+      else (log as any).derivedDirection = 'transit';
     }
   }
 
@@ -94,6 +194,7 @@ export class AccessLogsService {
     qb.skip((page - 1) * limit).take(limit);
 
     const [data, total] = await qb.getManyAndCount();
+    await this.attachDerivedDirections(data);
 
     return {
       data,
@@ -116,7 +217,9 @@ export class AccessLogsService {
     qb.orderBy('log.eventTime', 'DESC');
     qb.take(10000);
 
-    return qb.getMany();
+    const data = await qb.getMany();
+    await this.attachDerivedDirections(data);
+    return data;
   }
 
   async findUnknown(query: QueryAccessLogsDto): Promise<PaginatedResult<AccessLog>> {
@@ -132,6 +235,8 @@ export class AccessLogsService {
     qb.skip((page - 1) * limit).take(limit);
 
     const [data, total] = await qb.getManyAndCount();
+    // Tanımsız kartların personnelId null — derivedDirection de null kalır
+    for (const log of data) (log as any).derivedDirection = null;
 
     return {
       data,
@@ -188,41 +293,17 @@ export class AccessLogsService {
       const name = p ? `${p.firstName} ${p.lastName}` : `ID: ${pid}`;
       const dept = p?.department || '';
 
-      // Lokasyon bazlı hesaplama modu
-      const locId = pLogs[0].locationId || null;
-      const locCfg = await this.settingsService.getWorkConfigForLocation(locId);
-      const mode = locCfg.calculationMode || 'firstLast';
-
-      const inLogs = pLogs.filter((l) => l.direction === 'in');
-      const outLogs = pLogs.filter((l) => l.direction === 'out');
-
-      const firstIn = inLogs.length > 0 ? inLogs[0].eventTime : null;
-      const lastOut = outLogs.length > 0 ? outLogs[outLogs.length - 1].eventTime : null;
+      // Türev kural: ilk kayıt = giriş, son kayıt = çıkış
+      const firstIn = pLogs[0].eventTime;
+      const lastEvent = pLogs[pLogs.length - 1].eventTime;
+      // Tek kayıtlı gün → çıkış yok
+      const lastOut = pLogs.length > 1 ? lastEvent : null;
 
       let durationMinutes: number | null = null;
-      if (mode === 'paired') {
-        // Net: IN→OUT çift eşleştirmesi
-        let total = 0;
-        let openIn: Date | null = null;
-        for (const log of pLogs) {
-          if (log.direction === 'in') {
-            if (!openIn) openIn = new Date(log.eventTime);
-          } else if (log.direction === 'out' && openIn) {
-            const outTime = new Date(log.eventTime);
-            if (outTime > openIn) {
-              total += (outTime.getTime() - openIn.getTime()) / 60000;
-            }
-            openIn = null;
-          }
-        }
-        durationMinutes = total > 0 ? Math.round(total) : null;
-      } else {
-        // Brüt: ilk giriş → son çıkış
-        if (firstIn && lastOut && lastOut > firstIn) {
-          durationMinutes = Math.round(
-            (new Date(lastOut).getTime() - new Date(firstIn).getTime()) / 60000,
-          );
-        }
+      if (firstIn && lastOut && new Date(lastOut) > new Date(firstIn)) {
+        durationMinutes = Math.round(
+          (new Date(lastOut).getTime() - new Date(firstIn).getTime()) / 60000,
+        );
       }
 
       pairs.push({
@@ -233,11 +314,10 @@ export class AccessLogsService {
         lastOut: lastOut ? new Date(lastOut).toISOString() : null,
         durationMinutes,
         totalEvents: pLogs.length,
-        calculationMode: mode,
+        calculationMode: 'derived',
       });
     }
 
-    // Sırala: isme göre
     pairs.sort((a, b) => a.personnelName.localeCompare(b.personnelName, 'tr'));
 
     return { date, pairs };
@@ -282,7 +362,6 @@ export class AccessLogsService {
 
     // 2. Lokasyon bazlı mesai saatlerini çözümle
     const locCfg = await this.settingsService.getWorkConfigForLocation(data.locationId || null);
-    const offset = locCfg.tzOffsetMs / 3600000;
     const eventMs = new Date(data.eventTime).getTime();
     const localMs = eventMs + locCfg.tzOffsetMs;
     const localDate = new Date(localMs);
@@ -290,8 +369,8 @@ export class AccessLogsService {
     const localMinute = localDate.getUTCMinutes();
     const localTimeStr = `${String(localHour).padStart(2, '0')}:${String(localMinute).padStart(2, '0')}`;
 
-    const workStart = locCfg.workStartLabel; // e.g. "08:00"
-    const workEnd = locCfg.workEndLabel; // e.g. "17:00"
+    const workStart = locCfg.workStartLabel;
+    const workEnd = locCfg.workEndLabel;
 
     // Mesai saatlerinin 1 saat öncesi-sonrası dışındaysa uyarı
     const earlyLimit = this.subtractMinutes(workStart, 60);
@@ -312,28 +391,9 @@ export class AccessLogsService {
       return;
     }
 
-    // 3. Geç kalma kontrolü (sadece direction=in)
-    if (data.direction === 'in') {
-      // Esnek mesai: workStart + flexGraceMinutes + 15dk tolerans
-      // Normal mesai: workStart + 15dk tolerans
-      const graceMinutes = locCfg.isFlexible && locCfg.flexGraceMinutes
-        ? locCfg.flexGraceMinutes + 15
-        : 15;
-      const lateThreshold = this.addMinutes(workStart, graceMinutes);
-      if (localTimeStr > lateThreshold) {
-        const personnel = await this.personnelRepository.findOneBy({
-          id: data.personnelId,
-        });
-        const name = personnel
-          ? `${personnel.firstName} ${personnel.lastName}`
-          : `ID: ${data.personnelId}`;
-        this.notificationsService.add({
-          type: 'late_arrival',
-          message: `Geç giriş: ${name} (${localTimeStr})`,
-          personnelName: name,
-        });
-      }
-    }
+    // Geç kalma kontrolü: izin/görev modülü ile birlikte yeniden ele alınacak.
+    // Türev yön modelinde "ilk giriş" kavramı sorgulama anında hesaplandığı için
+    // anlık bildirim burada devre dışı bırakıldı (Rev 051).
   }
 
   private addMinutes(timeStr: string, minutes: number): string {
@@ -359,30 +419,36 @@ export class AccessLogsService {
     return { deleted: result.affected || 0 };
   }
 
+  /**
+   * Her lokasyondaki bugünkü en son kart geçişine göre personel sayısı.
+   * Türev modelde "kişi son olarak hangi lokasyonda okutmuşsa orada sayılır";
+   * bu dashboard / anlık doluluk görünümü için yeterli yaklaşım.
+   */
   async getPersonnelCountByLocation(): Promise<LocationOccupancy[]> {
-    const result = await this.accessLogsRepository
-      .createQueryBuilder('log')
-      .select('log.locationId', 'locationId')
-      .addSelect('location.name', 'locationName')
-      .addSelect('COUNT(DISTINCT log.personnelId)', 'count')
-      .innerJoin('log.location', 'location')
-      .where('log.personnelId IS NOT NULL')
-      .andWhere('log.direction = :direction', { direction: 'in' })
-      .andWhere(
-        `log.eventTime = (
-          SELECT MAX(sub.event_time)
-          FROM access_logs sub
-          WHERE sub.personnel_id = log.personnel_id
-        )`,
-      )
-      .groupBy('log.locationId')
-      .addGroupBy('location.name')
-      .getRawMany();
+    const rows: { locationId: string; locationName: string; count: string }[] =
+      await this.accessLogsRepository.query(
+        `SELECT log.location_id AS "locationId",
+                location.name AS "locationName",
+                COUNT(DISTINCT log.personnel_id)::int AS count
+         FROM access_logs log
+         INNER JOIN locations location ON location.id = log.location_id
+         WHERE log.personnel_id IS NOT NULL
+           AND date_trunc('day', log.event_time AT TIME ZONE $1)
+             = date_trunc('day', NOW() AT TIME ZONE $1)
+           AND log.event_time = (
+             SELECT MAX(sub.event_time) FROM access_logs sub
+             WHERE sub.personnel_id = log.personnel_id
+               AND date_trunc('day', sub.event_time AT TIME ZONE $1)
+                 = date_trunc('day', NOW() AT TIME ZONE $1)
+           )
+         GROUP BY log.location_id, location.name`,
+        [DAY_TZ],
+      );
 
-    return result.map((row) => ({
+    return rows.map((row) => ({
       locationId: row.locationId,
       locationName: row.locationName,
-      count: parseInt(row.count, 10),
+      count: typeof row.count === 'number' ? row.count : parseInt(row.count, 10),
     }));
   }
 }

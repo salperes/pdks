@@ -109,13 +109,33 @@ export class PersonnelService {
         lastAccessTime: string;
         lastDirection: string;
       }[] = await this.accessLogRepository.query(
-        `SELECT DISTINCT ON (personnel_id)
-           personnel_id AS "personnelId",
-           event_time AS "lastAccessTime",
-           direction AS "lastDirection"
-         FROM access_logs
-         WHERE personnel_id = ANY($1)
-         ORDER BY personnel_id, event_time DESC`,
+        `WITH last_log AS (
+           SELECT DISTINCT ON (personnel_id)
+             personnel_id, event_time
+           FROM access_logs
+           WHERE personnel_id = ANY($1)
+           ORDER BY personnel_id, event_time DESC
+         ),
+         last_day AS (
+           SELECT ll.personnel_id, ll.event_time,
+                  MIN(sub.event_time) AS min_t,
+                  MAX(sub.event_time) AS max_t,
+                  COUNT(*) AS cnt
+           FROM last_log ll
+           JOIN access_logs sub ON sub.personnel_id = ll.personnel_id
+             AND date_trunc('day', sub.event_time AT TIME ZONE 'Europe/Istanbul')
+               = date_trunc('day', ll.event_time AT TIME ZONE 'Europe/Istanbul')
+           GROUP BY ll.personnel_id, ll.event_time
+         )
+         SELECT personnel_id AS "personnelId",
+                event_time AS "lastAccessTime",
+                CASE
+                  WHEN cnt = 1 THEN 'in'
+                  WHEN event_time = min_t THEN 'in'
+                  WHEN event_time = max_t THEN 'out'
+                  ELSE 'transit'
+                END AS "lastDirection"
+         FROM last_day`,
         [ids],
       );
 
@@ -248,13 +268,48 @@ export class PersonnelService {
             `${year}-${String(month + 2).padStart(2, '0')}-01T00:00:00${tz}`,
           );
 
-    // Son 10 geçiş
-    const recentLogs = await this.accessLogRepository.find({
-      where: { personnelId: id },
-      order: { eventTime: 'DESC' },
-      take: 10,
-      relations: ['device', 'location'],
-    });
+    // Son 10 geçiş (direction = türev)
+    const recentLogs: Array<{
+      id: string;
+      eventTime: Date;
+      direction: string | null;
+      device: { name: string } | null;
+      location: { name: string } | null;
+    }> = (
+      await this.accessLogRepository.query(
+        `SELECT al.id, al.event_time AS "eventTime",
+                CASE
+                  WHEN al.event_time = (
+                    SELECT MIN(sub.event_time) FROM access_logs sub
+                    WHERE sub.personnel_id = al.personnel_id
+                      AND date_trunc('day', sub.event_time AT TIME ZONE 'Europe/Istanbul')
+                        = date_trunc('day', al.event_time AT TIME ZONE 'Europe/Istanbul')
+                  ) THEN 'in'
+                  WHEN al.event_time = (
+                    SELECT MAX(sub.event_time) FROM access_logs sub
+                    WHERE sub.personnel_id = al.personnel_id
+                      AND date_trunc('day', sub.event_time AT TIME ZONE 'Europe/Istanbul')
+                        = date_trunc('day', al.event_time AT TIME ZONE 'Europe/Istanbul')
+                  ) THEN 'out'
+                  ELSE 'transit'
+                END AS direction,
+                d.name AS "deviceName",
+                l.name AS "locationName"
+         FROM access_logs al
+         LEFT JOIN devices d ON d.id = al.device_id
+         LEFT JOIN locations l ON l.id = al.location_id
+         WHERE al.personnel_id = $1
+         ORDER BY al.event_time DESC
+         LIMIT 10`,
+        [id],
+      )
+    ).map((r: any) => ({
+      id: r.id,
+      eventTime: r.eventTime,
+      direction: r.direction,
+      device: r.deviceName ? { name: r.deviceName } : null,
+      location: r.locationName ? { name: r.locationName } : null,
+    }));
 
     // Bu ay kaç gün geldi
     const daysPresent: { day: string }[] =

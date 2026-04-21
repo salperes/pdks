@@ -41,7 +41,7 @@ export class QueryService {
 
     const ids = persons.map((p) => p.id);
 
-    // Tek sorguda tüm ID'ler için stats
+    // Tek sorguda tüm ID'ler için stats. lastDirection = son kayıtın türev yönü.
     const stats: Array<{
       personnelId: string;
       totalLogs: string;
@@ -49,17 +49,37 @@ export class QueryService {
       lastDirection: string | null;
       lastDeviceName: string | null;
     }> = await this.accessLogRepo.query(
-      `SELECT
+      `WITH last_log AS (
+         SELECT DISTINCT ON (al.personnel_id)
+           al.personnel_id, al.id, al.event_time, al.device_id
+         FROM access_logs al
+         WHERE al.personnel_id = ANY($1)
+         ORDER BY al.personnel_id, al.event_time DESC
+       ),
+       last_day AS (
+         SELECT ll.personnel_id, ll.id, ll.event_time, ll.device_id,
+                MIN(sub.event_time) AS min_t,
+                MAX(sub.event_time) AS max_t,
+                COUNT(*) AS cnt
+         FROM last_log ll
+         JOIN access_logs sub ON sub.personnel_id = ll.personnel_id
+           AND date_trunc('day', sub.event_time AT TIME ZONE 'Europe/Istanbul')
+             = date_trunc('day', ll.event_time AT TIME ZONE 'Europe/Istanbul')
+         GROUP BY ll.personnel_id, ll.id, ll.event_time, ll.device_id
+       )
+       SELECT
          al.personnel_id AS "personnelId",
          COUNT(*) AS "totalLogs",
          MAX(al.event_time) AS "lastAccessTime",
-         (SELECT a2.direction FROM access_logs a2
-          WHERE a2.personnel_id = al.personnel_id
-          ORDER BY a2.event_time DESC LIMIT 1) AS "lastDirection",
-         (SELECT d.name FROM access_logs a3
-          JOIN devices d ON d.id = a3.device_id
-          WHERE a3.personnel_id = al.personnel_id
-          ORDER BY a3.event_time DESC LIMIT 1) AS "lastDeviceName"
+         (SELECT CASE
+            WHEN ld.cnt = 1 THEN 'in'
+            WHEN ld.event_time = ld.min_t THEN 'in'
+            WHEN ld.event_time = ld.max_t THEN 'out'
+            ELSE 'transit'
+          END FROM last_day ld WHERE ld.personnel_id = al.personnel_id) AS "lastDirection",
+         (SELECT d.name FROM last_day ld
+          JOIN devices d ON d.id = ld.device_id
+          WHERE ld.personnel_id = al.personnel_id) AS "lastDeviceName"
        FROM access_logs al
        WHERE al.personnel_id = ANY($1)
        GROUP BY al.personnel_id`,
@@ -68,7 +88,7 @@ export class QueryService {
 
     const statsMap = new Map(stats.map((s) => [s.personnelId, s]));
 
-    // Son 5 log — window function ile tek sorguda
+    // Son 5 log — window function ile tek sorguda; direction türev olarak hesaplanır
     const recentRows: Array<{
       personnelId: string;
       id: string;
@@ -81,7 +101,21 @@ export class QueryService {
          rl.personnel_id AS "personnelId",
          rl.id,
          rl.event_time AS "eventTime",
-         rl.direction,
+         CASE
+           WHEN rl.event_time = (
+             SELECT MIN(sub.event_time) FROM access_logs sub
+             WHERE sub.personnel_id = rl.personnel_id
+               AND date_trunc('day', sub.event_time AT TIME ZONE 'Europe/Istanbul')
+                 = date_trunc('day', rl.event_time AT TIME ZONE 'Europe/Istanbul')
+           ) THEN 'in'
+           WHEN rl.event_time = (
+             SELECT MAX(sub.event_time) FROM access_logs sub
+             WHERE sub.personnel_id = rl.personnel_id
+               AND date_trunc('day', sub.event_time AT TIME ZONE 'Europe/Istanbul')
+                 = date_trunc('day', rl.event_time AT TIME ZONE 'Europe/Istanbul')
+           ) THEN 'out'
+           ELSE 'transit'
+         END AS direction,
          d.name AS "deviceName",
          l.name AS "locationName"
        FROM (
@@ -164,7 +198,22 @@ export class QueryService {
         `SELECT
            al.id,
            al.event_time AS "eventTime",
-           al.direction,
+           CASE
+             WHEN al.personnel_id IS NULL THEN NULL
+             WHEN al.event_time = (
+               SELECT MIN(sub.event_time) FROM access_logs sub
+               WHERE sub.personnel_id = al.personnel_id
+                 AND date_trunc('day', sub.event_time AT TIME ZONE 'Europe/Istanbul')
+                   = date_trunc('day', al.event_time AT TIME ZONE 'Europe/Istanbul')
+             ) THEN 'in'
+             WHEN al.event_time = (
+               SELECT MAX(sub.event_time) FROM access_logs sub
+               WHERE sub.personnel_id = al.personnel_id
+                 AND date_trunc('day', sub.event_time AT TIME ZONE 'Europe/Istanbul')
+                   = date_trunc('day', al.event_time AT TIME ZONE 'Europe/Istanbul')
+             ) THEN 'out'
+             ELSE 'transit'
+           END AS direction,
            al.device_user_id AS "deviceUserId",
            COALESCE(al.raw_data->>'cardNo', al.raw_data->>'CardNo') AS "rawCardNo",
            d.name AS "deviceName",
@@ -202,7 +251,21 @@ export class QueryService {
         `SELECT
            al.id,
            al.event_time AS "eventTime",
-           al.direction,
+           CASE
+             WHEN al.event_time = (
+               SELECT MIN(sub.event_time) FROM access_logs sub
+               WHERE sub.personnel_id = al.personnel_id
+                 AND date_trunc('day', sub.event_time AT TIME ZONE 'Europe/Istanbul')
+                   = date_trunc('day', al.event_time AT TIME ZONE 'Europe/Istanbul')
+             ) THEN 'in'
+             WHEN al.event_time = (
+               SELECT MAX(sub.event_time) FROM access_logs sub
+               WHERE sub.personnel_id = al.personnel_id
+                 AND date_trunc('day', sub.event_time AT TIME ZONE 'Europe/Istanbul')
+                   = date_trunc('day', al.event_time AT TIME ZONE 'Europe/Istanbul')
+             ) THEN 'out'
+             ELSE 'transit'
+           END AS direction,
            al.device_user_id AS "deviceUserId",
            d.name AS "deviceName",
            l.name AS "locationName"

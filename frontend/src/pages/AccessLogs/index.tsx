@@ -6,6 +6,7 @@ import {
   ChevronRight,
   ArrowUpRight,
   ArrowDownLeft,
+  ArrowLeftRight,
   Calendar,
   X,
   AlertTriangle,
@@ -64,7 +65,7 @@ interface Toast {
   type: 'success' | 'error';
 }
 
-const DirectionBadge = ({ direction }: { direction?: 'in' | 'out' }) => {
+const DirectionBadge = ({ direction }: { direction?: 'in' | 'out' | 'transit' | null }) => {
   if (direction === 'in') {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
@@ -78,6 +79,14 @@ const DirectionBadge = ({ direction }: { direction?: 'in' | 'out' }) => {
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400">
         <ArrowUpRight className="w-3 h-3" />
         ÇIKIŞ
+      </span>
+    );
+  }
+  if (direction === 'transit') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+        <ArrowLeftRight className="w-3 h-3" />
+        ARA
       </span>
     );
   }
@@ -282,7 +291,8 @@ export const AccessLogsPage = () => {
         const device = log.device?.name || '';
         const loc = log.location?.name || '';
         const time = formatDateTime(log.eventTime);
-        const dir = log.direction === 'in' ? 'Giriş' : log.direction === 'out' ? 'Çıkış' : '';
+        const d = log.derivedDirection ?? log.direction;
+        const dir = d === 'in' ? 'Giriş' : d === 'out' ? 'Çıkış' : d === 'transit' ? 'Ara' : '';
         return `${name};${card};${dept};${device};${loc};${time};${dir}`;
       });
 
@@ -606,6 +616,7 @@ export const AccessLogsPage = () => {
                 <option value="">Tüm Yönler</option>
                 <option value="in">Giriş</option>
                 <option value="out">Çıkış</option>
+                <option value="transit">Ara</option>
               </select>
             </div>
 
@@ -894,7 +905,7 @@ export const AccessLogsPage = () => {
                         {formatDateTime(log.eventTime)}
                       </td>
                       <td className="px-6 py-3">
-                        <DirectionBadge direction={log.direction} />
+                        <DirectionBadge direction={(log.derivedDirection ?? log.direction) as 'in' | 'out' | 'transit' | null} />
                       </td>
                     </tr>
                   ))

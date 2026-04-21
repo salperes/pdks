@@ -1,5 +1,5 @@
-import { IsOptional, IsUUID, IsString, IsDateString, IsInt, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsUUID, IsString, IsDateString, IsInt, Min, IsIn, IsBoolean } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 
 export class QueryAccessLogsDto {
   @IsUUID()
@@ -23,8 +23,14 @@ export class QueryAccessLogsDto {
   endDate?: string;
 
   @IsString()
+  @IsIn(['in', 'out', 'transit'])
   @IsOptional()
-  direction?: string;
+  direction?: 'in' | 'out' | 'transit';
+
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  includeTransit?: boolean;
 
   @IsString()
   @IsOptional()

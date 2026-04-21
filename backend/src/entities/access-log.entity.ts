@@ -14,6 +14,7 @@ import { Location } from './location.entity';
 
 @Entity('access_logs')
 @Unique(['deviceId', 'deviceUserId', 'eventTime'])
+@Index(['personnelId', 'eventTime'])
 export class AccessLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;

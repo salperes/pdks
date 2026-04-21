@@ -206,9 +206,6 @@ export class AdmsService {
     if (personnel) {
       accessLog.personnelId = personnel.id;
     }
-    if (device.direction !== 'both') {
-      accessLog.direction = device.direction;
-    }
 
     await this.accessLogRepository.save(accessLog);
     return true;

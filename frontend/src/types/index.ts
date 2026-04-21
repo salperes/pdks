@@ -47,7 +47,7 @@ export interface Personnel {
   isActive: boolean;
   createdAt: string;
   lastAccessTime?: string;
-  lastDirection?: 'in' | 'out';
+  lastDirection?: 'in' | 'out' | 'transit' | null;
 }
 
 export interface WorkSchedule {
@@ -97,7 +97,8 @@ export interface AccessLog {
   location?: Location;
   deviceUserId?: number;
   eventTime: string;
-  direction?: 'in' | 'out';
+  direction?: 'in' | 'out' | 'transit' | null;
+  derivedDirection?: 'in' | 'out' | 'transit' | null;
   source: string;
 }
 

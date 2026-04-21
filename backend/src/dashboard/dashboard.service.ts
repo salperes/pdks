@@ -40,34 +40,30 @@ export class DashboardService {
         this.deviceRepo.count({ where: { isActive: true } }),
         this.deviceRepo.count({ where: { isActive: true, isOnline: true } }),
 
-        // Bugün giriş yapan benzersiz personel
+        // Bugün kart okutan benzersiz personel (= günün ilk kaydı olan kişi = bugün giriş yapan)
         this.accessLogRepo
           .createQueryBuilder('log')
-          .select('COUNT(DISTINCT log.personnelId)')
+          .select('COUNT(DISTINCT log.personnelId)', 'count')
           .where('log.eventTime >= :start', { start: todayUtc })
           .andWhere('log.eventTime < :end', { end: tomorrowUtc })
-          .andWhere('log.direction = :dir', { dir: 'in' })
           .andWhere('log.personnelId IS NOT NULL')
           .getRawOne()
           .then((r) => parseInt(r?.count || '0', 10)),
 
-        // İçeride olan: son kaydı "in" olan personel sayısı
+        // İçeride olan: bugünkü kayıt sayısı tek olan personel (turnike varsayımı)
+        // Tek kayıt → giriş yaptı, çıkmadı; çift kayıt → girdi-çıktı
         this.accessLogRepo
-          .createQueryBuilder('log')
-          .select('COUNT(*)')
-          .from((qb) => {
-            return qb
-              .select('DISTINCT ON (sub.personnelId) sub.direction', 'dir')
-              .from(AccessLog, 'sub')
-              .where('sub.eventTime >= :start', { start: todayUtc })
-              .andWhere('sub.eventTime < :end', { end: tomorrowUtc })
-              .andWhere('sub.personnelId IS NOT NULL')
-              .orderBy('sub.personnelId')
-              .addOrderBy('sub.eventTime', 'DESC');
-          }, 'latest')
-          .where('latest.dir = :dir', { dir: 'in' })
-          .getRawOne()
-          .then((r) => parseInt(r?.count || '0', 10)),
+          .query(
+            `SELECT COUNT(*)::int AS count FROM (
+               SELECT personnel_id, COUNT(*) AS c
+               FROM access_logs
+               WHERE event_time >= $1 AND event_time < $2 AND personnel_id IS NOT NULL
+               GROUP BY personnel_id
+               HAVING COUNT(*) % 2 = 1
+             ) t`,
+            [todayUtc, tomorrowUtc],
+          )
+          .then((rows: { count: number }[]) => rows[0]?.count || 0),
       ]);
 
     return {
@@ -89,16 +85,30 @@ export class DashboardService {
     const absH = Math.abs(offset);
     const intervalStr = `${sign}${absH} hours`;
 
+    // Türev yön: gündeki ilk kayıt=in, son kayıt=out (tek kayıt → sadece in). Ara kayıtlar histogramda sayılmaz.
     const rows: { hour: string; direction: string; cnt: string }[] =
       await this.accessLogRepo.query(
-        `SELECT
-           EXTRACT(HOUR FROM event_time + INTERVAL '${intervalStr}')::int AS hour,
-           direction,
-           COUNT(*)::int AS cnt
-         FROM access_logs
-         WHERE event_time >= $1
-           AND event_time < $2
-           AND direction IS NOT NULL
+        `WITH day_stats AS (
+           SELECT personnel_id,
+                  MIN(event_time) AS min_t,
+                  MAX(event_time) AS max_t,
+                  COUNT(*) AS cnt
+           FROM access_logs
+           WHERE event_time >= $1 AND event_time < $2 AND personnel_id IS NOT NULL
+           GROUP BY personnel_id
+         )
+         SELECT hour, direction, COUNT(*)::int AS cnt FROM (
+           SELECT EXTRACT(HOUR FROM log.event_time + INTERVAL '${intervalStr}')::int AS hour,
+                  CASE
+                    WHEN log.event_time = ds.min_t THEN 'in'
+                    WHEN log.event_time = ds.max_t AND ds.cnt > 1 THEN 'out'
+                    ELSE NULL
+                  END AS direction
+           FROM access_logs log
+           JOIN day_stats ds ON ds.personnel_id = log.personnel_id
+           WHERE log.event_time >= $1 AND log.event_time < $2 AND log.personnel_id IS NOT NULL
+         ) x
+         WHERE direction IS NOT NULL
          GROUP BY 1, 2
          ORDER BY 1`,
         [todayUtc, tomorrowUtc],
