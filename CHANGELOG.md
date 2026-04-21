@@ -191,6 +191,29 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 054
+Rev. Date  : 21.04.2026
+Rev. Time  : 22:09:00
+Rev. Prompt: Supervisor API response parse hatası: res.data.results yerine res.data
+
+Rev. Report: (
+  Rev 053 sonrası her atama/kaldırma işleminde "Atama başarısız" toast'u
+  gösteriliyordu. Sebep: frontend `res.data?.results ?? []` okuyordu ama
+  backend `AssignmentResult[]` array'ini doğrudan döndürüyor (res.data = array).
+  Her zaman `results[0]` undefined → success=false branch'ı tetikleniyordu.
+
+  Eski bir bug; Rev 053 optimistic UI ile daha görünür hale geldi.
+  BulkAssign yolu zaten doğru kodlanmış (Array.isArray(res.data)).
+
+  FRONTEND — Supervisor/index.tsx:
+  - handleAssignDevices (single path)  → Array.isArray(res.data) ? res.data : []
+  - handleAssignLocation                → Array.isArray(res.data) ? res.data : []
+  - handleUnassign                      → Array.isArray(res.data) ? res.data : []
+  - handleMatrixCellClick               → Array.isArray(res.data) ? res.data : []
+
+  Değişen dosyalar: 3 (Supervisor/index.tsx, CHANGELOG.md, version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 053
 Rev. Date  : 21.04.2026
 Rev. Time  : 22:04:00

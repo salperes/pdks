@@ -418,7 +418,7 @@ export const SupervisorPage = () => {
           personnelId: selectedPersonnelId,
           deviceIds: Array.from(selectedDeviceIds),
         });
-        const results: AssignResult[] = res.data?.results ?? [];
+        const results: AssignResult[] = Array.isArray(res.data) ? res.data : [];
         const ok = results.filter((r) => r.success).length;
         const fail = results.filter((r) => !r.success).length;
         if (ok > 0) addToast(`${ok} cihaza başarıyla atandı.`, 'success');
@@ -450,7 +450,7 @@ export const SupervisorPage = () => {
         personnelId: selectedPersonnelId,
         locationId,
       });
-      const results: AssignResult[] = res.data?.results ?? [];
+      const results: AssignResult[] = Array.isArray(res.data) ? res.data : [];
       const ok = results.filter((r) => r.success).length;
       const fail = results.filter((r) => !r.success).length;
       if (ok > 0) addToast(`Lokasyondaki ${ok} cihaza başarıyla atandı.`, 'success');
@@ -505,7 +505,7 @@ export const SupervisorPage = () => {
         personnelId: selectedPersonnelId,
         deviceIds: [deviceId],
       });
-      const results: AssignResult[] = res.data?.results ?? [];
+      const results: AssignResult[] = Array.isArray(res.data) ? res.data : [];
       if (results[0]?.success) {
         addToast(`${results[0].deviceName} cihazından kaldırıldı.`, 'success');
       } else {
@@ -584,7 +584,7 @@ export const SupervisorPage = () => {
     try {
       const url = isRemove ? '/supervisor/unassign' : '/supervisor/assign';
       const res = await api.post(url, { personnelId, deviceIds: [deviceId] });
-      const results: AssignResult[] = res.data?.results ?? [];
+      const results: AssignResult[] = Array.isArray(res.data) ? res.data : [];
       const ok = results[0]?.success;
       if (ok) {
         addToast(`${pair}: ${isRemove ? 'Kaldırıldı.' : 'Atandı.'}`, 'success');
