@@ -191,6 +191,27 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 055
+Rev. Date  : 21.04.2026
+Rev. Time  : 22:14:00
+Rev. Prompt: Matris görünümünde header satırı scroll etmesin (sticky)
+
+Rev. Report: (
+  Erişim Yönetimi matrisi uzun personel listelerinde aşağı scroll edildiğinde
+  cihaz adlarını içeren header satırı kaybolup hangi sütunun hangi cihaz
+  olduğu takip edilemez hale geliyordu. Header artık dikey scroll sırasında
+  yapışık kalıyor.
+
+  FRONTEND — Supervisor/index.tsx (matris tablo):
+  - Dış container: overflow-x-auto → max-h-[70vh] overflow-auto
+  - Table: border-separate border-spacing-0 (sticky + border uyumu için)
+  - Thead <th> "Personel": sticky left-0 top-0 z-30 (sol üst köşe)
+  - Thead <th> cihaz kolonları: sticky top-0 z-20 bg-gray-50/dark-900
+  - Tbody sol <td> (personel kolonu): zaten sticky left-0 z-10 (değişmedi)
+
+  Değişen dosyalar: 3 (Supervisor/index.tsx, CHANGELOG.md, version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 054
 Rev. Date  : 21.04.2026
 Rev. Time  : 22:09:00

@@ -1121,17 +1121,17 @@ export const SupervisorPage = () => {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="max-h-[70vh] overflow-auto">
+              <table className="w-full text-sm border-separate border-spacing-0">
                 <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-900">
-                    <th className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700 min-w-[200px]">
+                  <tr>
+                    <th className="sticky left-0 top-0 z-30 bg-gray-50 dark:bg-gray-900 text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700 min-w-[200px]">
                       Personel
                     </th>
                     {matrix.devices.map((d) => (
                       <th
                         key={d.id}
-                        className="text-center px-3 py-3 border-b border-gray-200 dark:border-gray-700 min-w-[100px]"
+                        className="sticky top-0 z-20 bg-gray-50 dark:bg-gray-900 text-center px-3 py-3 border-b border-gray-200 dark:border-gray-700 min-w-[100px]"
                       >
                         <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate">
                           {d.name}
