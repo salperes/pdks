@@ -191,6 +191,53 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 057
+Rev. Date  : 28.04.2026
+Rev. Time  : 15:25:00
+Rev. Prompt: Reconcile job: DB - cihaz tutarliligi (gece cron + manuel buton)
+
+Rev. Report: (
+  issues.txt #1 ve #3: Cihazda kullanici sessizce kaybolunca veya orphan
+  kayit kalinca PDKS gercek durumu yansitamiyordu. Reconcile servisi:
+
+  - Her gece 03:00'te @Cron('0 3 * * *') ile calisir
+  - Manuel tetik: Devices sayfasinda her cihazda "Esitle" butonu
+
+  Algoritma (her cihaz icin, veri kaybini engelleyen muhafazakar yaklasim):
+  1) Cihaza connect, getUsers ile uid+cardno listesini al
+  2) PDKS'in beklenen kullanicilarini hesapla
+     (personnel_devices ∩ personnel.isActive=true ∩ employeeId 1-99999)
+  3) PUSH: Cihazda olmayan beklenenler -> setUser
+     (personnel_devices.status='enrolled' veya 'failed' guncellenir)
+  4) DELETE: Cihazda var ama PDKS'te orphan olanlar -> deleteUser
+     ORPHAN tanimi: uid PDKS'te bir personele esleser AMA personel pasif
+     YA DA bu cihaza atanmamis. Bilinmeyen uid'lere DOKUNMA (admin /
+     fabrika varsayilanlari korunur).
+
+  BACKEND — yeni dosyalar:
+  - device-comm/reconcile.service.ts (Cron + reconcileAll + reconcileDevice)
+  - device-comm/reconcile.controller.ts (POST /device-comm/reconcile,
+    POST /device-comm/reconcile/:deviceId — admin only)
+
+  BACKEND — device-comm.module.ts:
+  - PersonnelDevice TypeORM repo eklendi
+  - ReconcileService provider, ReconcileController controller eklendi
+
+  FRONTEND — Devices/index.tsx:
+  - reconcilingIds state'i + handleReconcile() handler
+  - Cihaz kartinda "Esitle" butonu (RefreshCw ikonu)
+  - Toast: "X eklendi, Y silindi[, Z hata]" / "Cihaza erisilemedi"
+
+  Issue #4 (4353911 kart cakismasi) reproduce edilemedi, ornek vaka
+  geldiginde diagnoz yapilacak.
+
+  Degisen dosyalar: 6
+  Backend: 3 (reconcile.service.ts YENI, reconcile.controller.ts YENI,
+    device-comm.module.ts)
+  Frontend: 1 (Devices/index.tsx)
+  Diger: CHANGELOG.md, version.ts
+)
+---------------------------------------------------------
 Rev. ID    : 056
 Rev. Date  : 28.04.2026
 Rev. Time  : 15:08:00

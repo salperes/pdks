@@ -89,6 +89,7 @@ export const DevicesPage = () => {
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
   const [enrollingIds, setEnrollingIds] = useState<Set<string>>(new Set());
   const [pullingIds, setPullingIds] = useState<Set<string>>(new Set());
+  const [reconcilingIds, setReconcilingIds] = useState<Set<string>>(new Set());
   const [syncAllLoading, setSyncAllLoading] = useState(false);
 
   // Pull data modal
@@ -269,6 +270,28 @@ export const DevicesPage = () => {
       addToast(`${device.name}: Senkronizasyon başarısız.`, 'error');
     } finally {
       setSyncingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(device.id);
+        return next;
+      });
+    }
+  };
+
+  const handleReconcile = async (device: Device) => {
+    setReconcilingIds((prev) => new Set(prev).add(device.id));
+    try {
+      const res = await api.post(`/device-comm/reconcile/${device.id}`);
+      const r = res.data ?? {};
+      if (!r.reachable) {
+        addToast(`${device.name}: Cihaza erişilemedi.`, 'error');
+      } else {
+        const summary = `${r.pushed ?? 0} eklendi, ${r.deleted ?? 0} silindi${r.failed ? `, ${r.failed} hata` : ''}`;
+        addToast(`${device.name}: ${summary}`, r.failed ? 'error' : 'success');
+      }
+    } catch (err: any) {
+      addToast(`${device.name}: Eşitleme başarısız (${err?.response?.data?.message ?? 'hata'}).`, 'error');
+    } finally {
+      setReconcilingIds((prev) => {
         const next = new Set(prev);
         next.delete(device.id);
         return next;
@@ -520,6 +543,15 @@ export const DevicesPage = () => {
                 >
                   <Users className={`w-3.5 h-3.5 ${enrollingIds.has(device.id) ? 'animate-pulse' : ''}`} />
                   Toplu Tanımla
+                </button>
+                <button
+                  onClick={() => handleReconcile(device)}
+                  disabled={reconcilingIds.has(device.id)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                  title="DB ile cihazı tutarlı hale getir: eksikleri ekler, bilinen orphan'ları siler"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${reconcilingIds.has(device.id) ? 'animate-spin' : ''}`} />
+                  Eşitle
                 </button>
                 <button
                   onClick={() => handleFetchUsers(device)}
