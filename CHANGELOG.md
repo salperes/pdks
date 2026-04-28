@@ -191,6 +191,41 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 058
+Rev. Date  : 28.04.2026
+Rev. Time  : 16:20:00
+Rev. Prompt: Kart cakismasi: cakisan personel adini goster + 'Karti Cikar' butonu
+
+Rev. Report: (
+  issues.txt #4: "kart numarasi zaten kayitli" hatasinda kullanici hangi
+  personelle cakistigini goremiyordu. Ayrica eski sahipten karti kaldirmak
+  icin form alanini elle bosaltmak gerekiyordu (UX nede acik degildi).
+
+  BACKEND — personnel.service.ts:
+  - buildCardConflictMessage(cardNumber, owner) yardimcisi:
+    "X kart numarasi zaten kayitli: Ad Soyad (employeeId: N), durum: aktif/pasif.
+     Eski sahipten kaldirmak icin ilgili personeli acip ✕ butonunu kullanin."
+  - create(): conflict mesaji detaylandirildi
+  - update(): cardNumber degisirken on-conflict check + 23505 fallback'inde
+    de detayli mesaj
+
+  FRONTEND — Personnel/index.tsx:
+  - Kart No artik zorunlu degil (validation: sadece Ad+Soyad)
+  - Form'da bos kart no gonderilirse edit modunda payload.cardNumber=null
+    (Rev 056 sayesinde cihazlardan otomatik silinir)
+  - Kart No input'unun yanina ✕ "Karti Cikar" mini buton (sadece edit
+    modunda + dolu kart):
+    onclick → confirm → form'da cardNumber'i bosalt → user save ile commit
+  - Placeholder: "Kart no (opsiyonel)"
+
+  Issues #1 ve #3 Rev 057 (reconcile job) ile, #2 Rev 056 ile coreldu.
+  Issue #4 icin tani+UX kapatildi: yeni vakada cakisan kim oldugu hemen
+  gorunecek; cikartmak icin tek tik yeterli.
+
+  Degisen dosyalar: 4 (personnel.service.ts, Personnel/index.tsx,
+    CHANGELOG.md, version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 057
 Rev. Date  : 28.04.2026
 Rev. Time  : 15:25:00

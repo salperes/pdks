@@ -192,15 +192,24 @@ export class PersonnelService {
     return String(next);
   }
 
+  /** Kart çakışması durumunda mevcut sahibi açıklayan mesaj üret. */
+  private buildCardConflictMessage(cardNumber: string, owner: Personnel): string {
+    const status = owner.isActive ? 'aktif' : 'pasif';
+    const employeeId = owner.employeeId ? ` (employeeId: ${owner.employeeId})` : '';
+    return (
+      `"${cardNumber}" kart numarası zaten kayıtlı: ` +
+      `${owner.firstName} ${owner.lastName}${employeeId}, durum: ${status}. ` +
+      `Eski sahipten kaldırmak için ilgili personeli açıp kart kutusundaki ✕ butonunu kullanın.`
+    );
+  }
+
   async create(dto: CreatePersonnelDto): Promise<Personnel> {
     if (dto.cardNumber) {
       const existing = await this.personnelRepository.findOneBy({
         cardNumber: dto.cardNumber,
       });
       if (existing) {
-        throw new ConflictException(
-          `"${dto.cardNumber}" kart numarası zaten kayıtlı`,
-        );
+        throw new ConflictException(this.buildCardConflictMessage(dto.cardNumber, existing));
       }
     }
 
@@ -218,10 +227,17 @@ export class PersonnelService {
       Object.prototype.hasOwnProperty.call(dto, 'cardNumber') &&
       dto.cardNumber !== oldCardNumber;
 
-    // Kart değişiyorsa: önce eski kart no ile cihazlardaki user kaydını sil
-    // (uid değişmiyor; aynı uid ile re-push'tan önce eski iz temizlenir).
+    // Kart değişiyorsa: çakışma kontrolü + eski cihaz kaydı temizliği
     let assignedDeviceIds: string[] = [];
     if (cardNumberChanged) {
+      // Yeni karta sahip başka bir personel var mı? (informatif çakışma mesajı)
+      if (dto.cardNumber) {
+        const conflict = await this.personnelRepository.findOneBy({ cardNumber: dto.cardNumber });
+        if (conflict && conflict.id !== id) {
+          throw new ConflictException(this.buildCardConflictMessage(dto.cardNumber, conflict));
+        }
+      }
+      // Eski uid ile cihazlardaki user kaydını sil (uid değişmiyor)
       assignedDeviceIds = await this.removeFromAllAssignedDevices(personnel);
     }
 
@@ -231,6 +247,13 @@ export class PersonnelService {
       saved = await this.personnelRepository.save(personnel);
     } catch (err: any) {
       if (err?.code === '23505' && err?.detail?.includes('card_number')) {
+        // DB unique constraint çakışması — race condition fallback
+        const conflict = dto.cardNumber
+          ? await this.personnelRepository.findOneBy({ cardNumber: dto.cardNumber })
+          : null;
+        if (conflict) {
+          throw new ConflictException(this.buildCardConflictMessage(dto.cardNumber!, conflict));
+        }
         throw new ConflictException('Bu kart numarası başka bir personele atanmış.');
       }
       throw err;

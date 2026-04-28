@@ -334,16 +334,22 @@ export const PersonnelPage = () => {
   /* ---------- Save (create / update) ---------- */
 
   const handleSave = async () => {
-    if (!form.firstName.trim() || !form.lastName.trim() || !form.cardNumber.trim()) {
-      showToast('Ad, Soyad ve Kart No alanları zorunludur.', 'error');
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      showToast('Ad ve Soyad alanları zorunludur.', 'error');
       return;
     }
     setSaving(true);
 
-    const payload: Record<string, string> = {};
+    const payload: Record<string, string | null> = {};
     payload.firstName = form.firstName.trim();
     payload.lastName = form.lastName.trim();
-    payload.cardNumber = form.cardNumber.trim();
+    const trimmedCard = form.cardNumber.trim();
+    if (trimmedCard) {
+      payload.cardNumber = trimmedCard;
+    } else if (editingId) {
+      // Edit modunda kart kutusu boşaltıldı → null'a çek (cihazlardan da temizlenir)
+      payload.cardNumber = null;
+    }
     if (form.tcKimlikNo.trim()) payload.tcKimlikNo = form.tcKimlikNo.trim();
     if (form.employeeId.trim()) payload.employeeId = form.employeeId.trim();
     if (form.username.trim()) payload.username = form.username.trim();
@@ -1084,7 +1090,35 @@ export const PersonnelPage = () => {
                 <FormField label="Soyad" required value={form.lastName} onChange={(v) => updateField('lastName', v)} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField label="Kart No" required value={form.cardNumber} onChange={(v) => updateField('cardNumber', v)} />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Kart No
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Kart no (opsiyonel)"
+                      title="Kart numarası"
+                      value={form.cardNumber}
+                      onChange={(e) => updateField('cardNumber', e.target.value)}
+                      className="w-full pl-3 pr-10 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0078d4] focus:border-transparent"
+                    />
+                    {editingId && form.cardNumber.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm('Bu personelin kartı çıkarılacak ve atalı olduğu cihazlardan otomatik silinecek. Emin misiniz?')) {
+                            updateField('cardNumber', '');
+                          }
+                        }}
+                        title="Kartı çıkar (cihazlardan da silinir)"
+                        className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <FormField label="TC Kimlik No" value={form.tcKimlikNo} onChange={(v) => updateField('tcKimlikNo', v)} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
