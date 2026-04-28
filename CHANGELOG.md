@@ -191,6 +191,46 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 056
+Rev. Date  : 28.04.2026
+Rev. Time  : 15:08:00
+Rev. Prompt: Personel sil/kart degistir akislarinda cihazdan deleteUser
+
+Rev. Report: (
+  issues.txt #2: A'nin kartini silip B'ye verdigimizde cihaz hala A olarak
+  yorumluyordu (cihazda A'nin kaydi kaliyordu). Personel silme/kart degisikligi
+  akislarinda artik bagli cihazlardan da temizlik yapiliyor.
+
+  BACKEND — personnel.service.ts:
+  - Logger eklendi
+  - Constructor'a Device repo, PersonnelDevice repo, ZktecoClientService inject
+  - removeFromAllAssignedDevices(personnel) yardimcisi:
+    * personnel_devices tablosundaki tum atamalari al
+    * Her cihaza connect, deleteUser(uid), disconnect (sessiz hata)
+    * personnel_devices satirlarini sil
+    * Re-enroll edilebilir cihaz id listesi doner
+  - reenrollToDevices(personnel, deviceIds): yeni cardno ile setUser
+  - update(): cardNumber degistiyse → eski cihazlardan sil → save → re-enroll
+  - remove(): silmeden once cihazlardan deleteUser
+
+  BACKEND — personnel.module.ts:
+  - TypeOrmModule.forFeature'a PersonnelDevice eklendi
+  - DeviceCommModule global oldugu icin ZktecoClientService otomatik inject
+
+  Etkilenen senaryolar:
+  - Personel sil → cihazlardan kullanici kaldirilir (kart artik gecemez)
+  - cardNumber degistir → eski uid+cardno cihazdan silinir, yeni cardno ile
+    aynei cihazlara re-enroll yapilir (otomatik UX)
+  - Hata durumlari sessiz: cihaza erisilemezse log + status='failed'
+
+  Issues #1 ve #3 icin reconcile job (gece cron + manuel buton) Rev 057'de
+  yapilacak. Issue #4 (4353911 kart cakismasi) reproduce edilemedi, ornek
+  vaka geldiginde ele alinacak.
+
+  Degisen dosyalar: 4 (personnel.service.ts, personnel.module.ts,
+    CHANGELOG.md, version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 055
 Rev. Date  : 21.04.2026
 Rev. Time  : 22:14:00

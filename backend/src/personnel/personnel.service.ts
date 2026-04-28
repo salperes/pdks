@@ -1,12 +1,14 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Personnel, AccessLog } from '../entities';
+import { Personnel, AccessLog, Device, PersonnelDevice } from '../entities';
 import { SettingsService } from '../settings/settings.service';
+import { ZktecoClientService } from '../device-comm/zkteco-client.service';
 import { CreatePersonnelDto } from './dto/create-personnel.dto';
 import { UpdatePersonnelDto } from './dto/update-personnel.dto';
 
@@ -32,12 +34,19 @@ export interface PaginatedResult<T> {
 
 @Injectable()
 export class PersonnelService {
+  private readonly logger = new Logger(PersonnelService.name);
+
   constructor(
     @InjectRepository(Personnel)
     private readonly personnelRepository: Repository<Personnel>,
     @InjectRepository(AccessLog)
     private readonly accessLogRepository: Repository<AccessLog>,
+    @InjectRepository(Device)
+    private readonly deviceRepository: Repository<Device>,
+    @InjectRepository(PersonnelDevice)
+    private readonly personnelDeviceRepository: Repository<PersonnelDevice>,
     private readonly settingsService: SettingsService,
+    private readonly zktecoClient: ZktecoClientService,
   ) {}
 
   async findAll(options: FindAllOptions = {}): Promise<PaginatedResult<any>> {
@@ -204,20 +213,150 @@ export class PersonnelService {
 
   async update(id: string, dto: UpdatePersonnelDto): Promise<Personnel> {
     const personnel = await this.findById(id);
+    const oldCardNumber = personnel.cardNumber;
+    const cardNumberChanged =
+      Object.prototype.hasOwnProperty.call(dto, 'cardNumber') &&
+      dto.cardNumber !== oldCardNumber;
+
+    // Kart değişiyorsa: önce eski kart no ile cihazlardaki user kaydını sil
+    // (uid değişmiyor; aynı uid ile re-push'tan önce eski iz temizlenir).
+    let assignedDeviceIds: string[] = [];
+    if (cardNumberChanged) {
+      assignedDeviceIds = await this.removeFromAllAssignedDevices(personnel);
+    }
+
     Object.assign(personnel, dto);
+    let saved: Personnel;
     try {
-      return await this.personnelRepository.save(personnel);
+      saved = await this.personnelRepository.save(personnel);
     } catch (err: any) {
       if (err?.code === '23505' && err?.detail?.includes('card_number')) {
         throw new ConflictException('Bu kart numarası başka bir personele atanmış.');
       }
       throw err;
     }
+
+    // Yeni kart no ile aynı cihazlara re-enroll (sessiz hata: status='failed' yazılır)
+    if (cardNumberChanged && assignedDeviceIds.length > 0) {
+      await this.reenrollToDevices(saved, assignedDeviceIds);
+    }
+
+    return saved;
   }
 
   async remove(id: string): Promise<void> {
     const personnel = await this.findById(id);
+    await this.removeFromAllAssignedDevices(personnel);
     await this.personnelRepository.remove(personnel);
+  }
+
+  /**
+   * Bu personelin atandığı tüm cihazlardan ZKTeco user kaydını sil.
+   * personnel_devices satırlarını da temizler. Cihaza erişilemezse veya
+   * deleteUser fail olursa devam eder (sessiz hata, log).
+   * Kart transferi senaryosunda re-enroll için cihaz id listesi döner.
+   */
+  private async removeFromAllAssignedDevices(personnel: Personnel): Promise<string[]> {
+    const uid = parseInt(personnel.employeeId ?? '', 10);
+    if (isNaN(uid) || uid < 1 || uid > 99999) {
+      return [];
+    }
+
+    const assignments = await this.personnelDeviceRepository.find({
+      where: { personnelId: personnel.id },
+    });
+    if (assignments.length === 0) return [];
+
+    const deviceIds = assignments.map((a) => a.deviceId);
+    const devices = await this.deviceRepository.findByIds(deviceIds);
+    const deviceMap = new Map(devices.map((d) => [d.id, d]));
+
+    const reenrollableDeviceIds: string[] = [];
+    for (const a of assignments) {
+      const device = deviceMap.get(a.deviceId);
+      if (!device || !device.isActive) {
+        await this.personnelDeviceRepository.remove(a);
+        continue;
+      }
+
+      let zk: any;
+      try {
+        zk = await this.zktecoClient.connect(device.ipAddress, device.port, device.commKey);
+        await this.zktecoClient.deleteUser(zk, uid);
+        this.logger.log(
+          `Removed user uid=${uid} (${personnel.firstName} ${personnel.lastName}) from device "${device.name}"`,
+        );
+        // Cihaz başarılı silindiyse re-enroll listesine ekle
+        if (a.status === 'enrolled' || a.status === 'pending') {
+          reenrollableDeviceIds.push(device.id);
+        }
+      } catch (err: any) {
+        this.logger.warn(
+          `Failed to remove user uid=${uid} from device "${device.name}": ${err?.message ?? err}`,
+        );
+        // Cihaza ulaşılamadı; re-enroll'da denenecek
+        if (a.status === 'enrolled' || a.status === 'pending') {
+          reenrollableDeviceIds.push(device.id);
+        }
+      } finally {
+        if (zk) {
+          try { await this.zktecoClient.disconnect(zk); } catch { /* ignore */ }
+        }
+      }
+
+      await this.personnelDeviceRepository.remove(a);
+    }
+
+    return reenrollableDeviceIds;
+  }
+
+  /**
+   * Verilen cihazlara personeli (yeni cardNumber ile) yeniden enroll et.
+   * Hata olursa personnel_devices'a status='failed' yaz, devam et.
+   */
+  private async reenrollToDevices(personnel: Personnel, deviceIds: string[]): Promise<void> {
+    const uid = parseInt(personnel.employeeId ?? '', 10);
+    if (isNaN(uid) || uid < 1 || uid > 99999) return;
+
+    const name = `${personnel.firstName} ${personnel.lastName}`.substring(0, 24);
+    const cardno = parseInt(personnel.cardNumber ?? '0', 10) || 0;
+    const userIdOnDevice = personnel.employeeId ? String(personnel.employeeId) : String(uid);
+
+    const devices = await this.deviceRepository.findByIds(deviceIds);
+
+    for (const device of devices) {
+      if (!device.isActive) continue;
+
+      const pd = this.personnelDeviceRepository.create({
+        personnelId: personnel.id,
+        deviceId: device.id,
+        status: 'pending',
+      });
+
+      let zk: any;
+      try {
+        zk = await this.zktecoClient.connect(device.ipAddress, device.port, device.commKey);
+        await this.zktecoClient.getUsers(zk);
+        await this.zktecoClient.setUser(zk, uid, name, cardno, userIdOnDevice);
+        pd.status = 'enrolled';
+        pd.errorMessage = null;
+        this.logger.log(
+          `Re-enrolled "${name}" (uid=${uid}, cardno=${cardno}) on device "${device.name}"`,
+        );
+      } catch (err: any) {
+        pd.status = 'failed';
+        pd.errorMessage = (err?.message ?? 'Re-enroll hatası').substring(0, 500);
+        this.logger.warn(
+          `Re-enroll failed for "${name}" on device "${device.name}": ${err?.message ?? err}`,
+        );
+      } finally {
+        if (zk) {
+          try { await this.zktecoClient.disconnect(zk); } catch { /* ignore */ }
+        }
+      }
+
+      await this.personnelDeviceRepository.save(pd);
+    }
   }
 
   async updatePhoto(id: string, photoUrl: string | null): Promise<Personnel> {
