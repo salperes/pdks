@@ -50,7 +50,10 @@ export class AccessLogsService {
 
   // SQL WHERE parçası: derive edilmiş yöne göre filtre
   private derivedDirectionCase(): string {
+    // Öncelik: cihaz yön damgalamış (in/out) → onu kullan.
+    // Aksi halde personel + gün bazında ilk/son türev kuralı.
     return `(CASE
+      WHEN log.direction IN ('in', 'out') THEN log.direction
       WHEN log.personnel_id IS NULL THEN NULL
       WHEN log.event_time = (
         SELECT MIN(sub.event_time) FROM access_logs sub
@@ -162,6 +165,11 @@ export class AccessLogsService {
     }
 
     for (const log of logs) {
+      // Cihaz yön damgası varsa öncelik onda (yön belirtilmiş cihazdan gelen kayıt)
+      if (log.direction === 'in' || log.direction === 'out') {
+        (log as any).derivedDirection = log.direction;
+        continue;
+      }
       if (!log.personnelId) {
         (log as any).derivedDirection = null;
         continue;
@@ -293,11 +301,19 @@ export class AccessLogsService {
       const name = p ? `${p.firstName} ${p.lastName}` : `ID: ${pid}`;
       const dept = p?.department || '';
 
-      // Türev kural: ilk kayıt = giriş, son kayıt = çıkış
-      const firstIn = pLogs[0].eventTime;
-      const lastEvent = pLogs[pLogs.length - 1].eventTime;
-      // Tek kayıtlı gün → çıkış yok
-      const lastOut = pLogs.length > 1 ? lastEvent : null;
+      // Öncelik: yön damgalı cihaz kayıtları varsa onlar baz alınır
+      // (direction='in' → ilk 'in' = giriş; direction='out' → son 'out' = çıkış).
+      // Yoksa fallback: ilk/son türev kuralı.
+      const inLogs = pLogs.filter((l) => l.direction === 'in');
+      const outLogs = pLogs.filter((l) => l.direction === 'out');
+      const firstIn =
+        inLogs.length > 0 ? inLogs[0].eventTime : pLogs[0].eventTime;
+      const lastOut =
+        outLogs.length > 0
+          ? outLogs[outLogs.length - 1].eventTime
+          : pLogs.length > 1
+            ? pLogs[pLogs.length - 1].eventTime
+            : null;
 
       let durationMinutes: number | null = null;
       if (firstIn && lastOut && new Date(lastOut) > new Date(firstIn)) {
@@ -314,7 +330,7 @@ export class AccessLogsService {
         lastOut: lastOut ? new Date(lastOut).toISOString() : null,
         durationMinutes,
         totalEvents: pLogs.length,
-        calculationMode: 'derived',
+        calculationMode: inLogs.length + outLogs.length > 0 ? 'directed' : 'derived',
       });
     }
 

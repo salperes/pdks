@@ -206,6 +206,11 @@ export class AdmsService {
     if (personnel) {
       accessLog.personnelId = personnel.id;
     }
+    // Cihaz yön belirtmişse (in/out) kaydı doğrudan damga; 'both' ise null bırak
+    // (sorgulama anında ilk/son türev kuralı uygulanır).
+    if (device.direction === 'in' || device.direction === 'out') {
+      accessLog.direction = device.direction;
+    }
 
     await this.accessLogRepository.save(accessLog);
     return true;

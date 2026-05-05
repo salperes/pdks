@@ -120,13 +120,13 @@ export class PersonnelService {
       }[] = await this.accessLogRepository.query(
         `WITH last_log AS (
            SELECT DISTINCT ON (personnel_id)
-             personnel_id, event_time
+             personnel_id, event_time, direction
            FROM access_logs
            WHERE personnel_id = ANY($1)
            ORDER BY personnel_id, event_time DESC
          ),
          last_day AS (
-           SELECT ll.personnel_id, ll.event_time,
+           SELECT ll.personnel_id, ll.event_time, ll.direction,
                   MIN(sub.event_time) AS min_t,
                   MAX(sub.event_time) AS max_t,
                   COUNT(*) AS cnt
@@ -134,11 +134,12 @@ export class PersonnelService {
            JOIN access_logs sub ON sub.personnel_id = ll.personnel_id
              AND date_trunc('day', sub.event_time AT TIME ZONE 'Europe/Istanbul')
                = date_trunc('day', ll.event_time AT TIME ZONE 'Europe/Istanbul')
-           GROUP BY ll.personnel_id, ll.event_time
+           GROUP BY ll.personnel_id, ll.event_time, ll.direction
          )
          SELECT personnel_id AS "personnelId",
                 event_time AS "lastAccessTime",
                 CASE
+                  WHEN direction IN ('in', 'out') THEN direction
                   WHEN cnt = 1 THEN 'in'
                   WHEN event_time = min_t THEN 'in'
                   WHEN event_time = max_t THEN 'out'
@@ -441,6 +442,7 @@ export class PersonnelService {
       await this.accessLogRepository.query(
         `SELECT al.id, al.event_time AS "eventTime",
                 CASE
+                  WHEN al.direction IN ('in', 'out') THEN al.direction
                   WHEN al.event_time = (
                     SELECT MIN(sub.event_time) FROM access_logs sub
                     WHERE sub.personnel_id = al.personnel_id

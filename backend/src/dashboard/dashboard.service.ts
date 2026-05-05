@@ -100,6 +100,7 @@ export class DashboardService {
          SELECT hour, direction, COUNT(*)::int AS cnt FROM (
            SELECT EXTRACT(HOUR FROM log.event_time + INTERVAL '${intervalStr}')::int AS hour,
                   CASE
+                    WHEN log.direction IN ('in', 'out') THEN log.direction
                     WHEN log.event_time = ds.min_t THEN 'in'
                     WHEN log.event_time = ds.max_t AND ds.cnt > 1 THEN 'out'
                     ELSE NULL

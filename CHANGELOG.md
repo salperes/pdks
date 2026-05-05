@@ -191,6 +191,55 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 059
+Rev. Date  : 02.05.2026
+Rev. Time  : 08:20:00
+Rev. Prompt: Yon belirtilen cihazlarda direction kayda yazilsin, turev sadece yon belirtilmeyen cihazlarda kaslin
+
+Rev. Report: (
+  Sahaya yon-bazli cihazlar (SC800 vb. giris/cikis ayri okuyucular) eklenmek
+  uzere. device.direction='in' veya 'out' ise log artik o yonu DOGRUDAN yaziyor;
+  direction='both' (mevcut SC403'ler) icin Rev 051'deki turev (ilk/son) kurali
+  korunuyor. Hibrit model.
+
+  BACKEND — Yazma tarafi:
+  - device-comm/sync.service.ts: device.direction in ('in','out') ise
+    accessLog.direction = device.direction yaziliyor
+  - adms/adms.service.ts: ayni mantik
+
+  BACKEND — access-logs.service.ts:
+  - derivedDirectionCase() SQL CASE'in basina:
+      WHEN log.direction IN ('in', 'out') THEN log.direction
+      WHEN log.personnel_id IS NULL THEN NULL
+      ... (turev ilk/son fallback)
+  - attachDerivedDirections() JS: log.direction varsa onu yaz, yoksa min/max
+    hesabi
+  - findPaired() gunluk rapor: direction='in' kayit varsa ilk 'in' = giris,
+    direction='out' kayit varsa son 'out' = cikis; yoksa ilk/son fallback
+
+  BACKEND — Diger servisler:
+  - dashboard.service.ts > getHourlyStats(): CASE basina
+    WHEN log.direction IN ('in','out') THEN log.direction
+  - query.service.ts: 3 CASE bloku ve last_log/last_day CTE'lerine direction
+    kolonu + oncelik
+  - personnel.service.ts: lastDirection CASE'i + recentLogs CASE'i
+
+  BACKEND — reports.service.ts > processDayLogs():
+  - inLogs/outLogs filter'i + fallback turev mantigi (Rev 051 oncesi davranisin
+    iyilestirilmis hali)
+
+  Ortak desen: Cihaz yon damgali ise cihazi dinle; degilse personel-gun bazinda
+  ilk/son turev. Hibrit model SC403 + SC800 birlikte calisirken her ikisi de
+  dogru gosterilir.
+
+  FRONTEND degismedi (zaten log.derivedDirection ?? log.direction zincirini
+  kullaniyor — Rev 051'den beri).
+
+  Degisen dosyalar: 7 (sync.service.ts, adms.service.ts, access-logs.service.ts,
+    dashboard.service.ts, query.service.ts, personnel.service.ts,
+    reports.service.ts) + CHANGELOG + version.ts
+)
+---------------------------------------------------------
 Rev. ID    : 058
 Rev. Date  : 28.04.2026
 Rev. Time  : 16:20:00

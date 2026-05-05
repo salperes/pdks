@@ -51,13 +51,13 @@ export class QueryService {
     }> = await this.accessLogRepo.query(
       `WITH last_log AS (
          SELECT DISTINCT ON (al.personnel_id)
-           al.personnel_id, al.id, al.event_time, al.device_id
+           al.personnel_id, al.id, al.event_time, al.device_id, al.direction
          FROM access_logs al
          WHERE al.personnel_id = ANY($1)
          ORDER BY al.personnel_id, al.event_time DESC
        ),
        last_day AS (
-         SELECT ll.personnel_id, ll.id, ll.event_time, ll.device_id,
+         SELECT ll.personnel_id, ll.id, ll.event_time, ll.device_id, ll.direction,
                 MIN(sub.event_time) AS min_t,
                 MAX(sub.event_time) AS max_t,
                 COUNT(*) AS cnt
@@ -65,13 +65,14 @@ export class QueryService {
          JOIN access_logs sub ON sub.personnel_id = ll.personnel_id
            AND date_trunc('day', sub.event_time AT TIME ZONE 'Europe/Istanbul')
              = date_trunc('day', ll.event_time AT TIME ZONE 'Europe/Istanbul')
-         GROUP BY ll.personnel_id, ll.id, ll.event_time, ll.device_id
+         GROUP BY ll.personnel_id, ll.id, ll.event_time, ll.device_id, ll.direction
        )
        SELECT
          al.personnel_id AS "personnelId",
          COUNT(*) AS "totalLogs",
          MAX(al.event_time) AS "lastAccessTime",
          (SELECT CASE
+            WHEN ld.direction IN ('in', 'out') THEN ld.direction
             WHEN ld.cnt = 1 THEN 'in'
             WHEN ld.event_time = ld.min_t THEN 'in'
             WHEN ld.event_time = ld.max_t THEN 'out'
@@ -102,6 +103,7 @@ export class QueryService {
          rl.id,
          rl.event_time AS "eventTime",
          CASE
+           WHEN rl.direction IN ('in', 'out') THEN rl.direction
            WHEN rl.event_time = (
              SELECT MIN(sub.event_time) FROM access_logs sub
              WHERE sub.personnel_id = rl.personnel_id
@@ -199,6 +201,7 @@ export class QueryService {
            al.id,
            al.event_time AS "eventTime",
            CASE
+             WHEN al.direction IN ('in', 'out') THEN al.direction
              WHEN al.personnel_id IS NULL THEN NULL
              WHEN al.event_time = (
                SELECT MIN(sub.event_time) FROM access_logs sub
@@ -252,6 +255,7 @@ export class QueryService {
            al.id,
            al.event_time AS "eventTime",
            CASE
+             WHEN al.direction IN ('in', 'out') THEN al.direction
              WHEN al.event_time = (
                SELECT MIN(sub.event_time) FROM access_logs sub
                WHERE sub.personnel_id = al.personnel_id

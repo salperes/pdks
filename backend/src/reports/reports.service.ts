@@ -95,8 +95,11 @@ interface DayResult {
 }
 
 /**
- * Türev yön modeli: girişi olan günlerde ilk kayıt = giriş, son kayıt = çıkış,
- * aradakiler ara geçiştir. Logların event_time'a göre sıralı geldiği varsayılır.
+ * Yön modeli (öncelikli):
+ *   1) Yön damgalı (direction='in'/'out') cihaz kayıtları varsa: ilk 'in' = giriş,
+ *      son 'out' = çıkış.
+ *   2) Yoksa türev kuralı: ilk kayıt = giriş, son kayıt = çıkış.
+ * Logların event_time'a göre sıralı geldiği varsayılır.
  */
 function processDayLogs(logs: AccessLog[], cfg: WorkConfig): DayResult {
   if (logs.length === 0) {
@@ -110,8 +113,17 @@ function processDayLogs(logs: AccessLog[], cfg: WorkConfig): DayResult {
     };
   }
 
-  const firstIn = new Date(logs[0].eventTime);
-  const lastOut = logs.length > 1 ? new Date(logs[logs.length - 1].eventTime) : null;
+  const inLogs = logs.filter((l) => l.direction === 'in');
+  const outLogs = logs.filter((l) => l.direction === 'out');
+
+  const firstIn =
+    inLogs.length > 0 ? new Date(inLogs[0].eventTime) : new Date(logs[0].eventTime);
+  const lastOut =
+    outLogs.length > 0
+      ? new Date(outLogs[outLogs.length - 1].eventTime)
+      : logs.length > 1
+        ? new Date(logs[logs.length - 1].eventTime)
+        : null;
 
   let totalMinutes = 0;
   if (firstIn && lastOut && lastOut > firstIn) {
