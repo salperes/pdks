@@ -85,14 +85,15 @@ export class PersonnelService {
       );
     }
 
+    // Türkçe karakter sıralaması için ICU collation (Ş/İ/Ç/Ö/Ü/Ğ doğru yerde).
     const allowedSort: Record<string, string> = {
-      firstName: 'p.firstName',
-      lastName: 'p.lastName',
+      firstName: `p.firstName COLLATE "tr-TR-x-icu"`,
+      lastName: `p.lastName COLLATE "tr-TR-x-icu"`,
       cardNumber: 'p.cardNumber',
-      department: 'p.department',
+      department: `p.department COLLATE "tr-TR-x-icu"`,
       isActive: 'p.isActive',
       createdAt: 'p.createdAt',
-      username: 'p.username',
+      username: `p.username COLLATE "tr-TR-x-icu"`,
     };
     const orderDir = sortDir === 'ASC' ? 'ASC' : 'DESC';
 
@@ -519,10 +520,12 @@ export class PersonnelService {
   }
 
   async exportCsv(): Promise<string> {
-    const all = await this.personnelRepository.find({
-      select: ['firstName', 'lastName', 'cardNumber', 'username', 'department', 'isActive'],
-      order: { firstName: 'ASC', lastName: 'ASC' },
-    });
+    const all = await this.personnelRepository
+      .createQueryBuilder('p')
+      .select(['p.firstName', 'p.lastName', 'p.cardNumber', 'p.username', 'p.department', 'p.isActive'])
+      .orderBy('p.firstName COLLATE "tr-TR-x-icu"', 'ASC')
+      .addOrderBy('p.lastName COLLATE "tr-TR-x-icu"', 'ASC')
+      .getMany();
 
     const esc = (v: string | null | undefined) => {
       if (v == null) return '';

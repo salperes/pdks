@@ -17,7 +17,7 @@ export class LocationsService {
       .createQueryBuilder('l')
       .leftJoinAndSelect('l.workSchedule', 'ws')
       .loadRelationCountAndMap('l.devicesCount', 'l.devices')
-      .orderBy('l.name', 'ASC')
+      .orderBy('l.name COLLATE "tr-TR-x-icu"', 'ASC')
       .getMany();
 
     return locations as (Location & { devicesCount: number })[];

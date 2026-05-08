@@ -44,8 +44,8 @@ export class SupervisorService {
       .leftJoinAndSelect('pd.personnel', 'personnel')
       .leftJoinAndSelect('pd.device', 'device')
       .leftJoinAndSelect('device.location', 'location')
-      .orderBy('personnel.firstName', 'ASC')
-      .addOrderBy('device.name', 'ASC');
+      .orderBy('personnel.firstName COLLATE "tr-TR-x-icu"', 'ASC')
+      .addOrderBy('device.name COLLATE "tr-TR-x-icu"', 'ASC');
 
     if (personnelId) {
       qb.where('pd.personnelId = :personnelId', { personnelId });
@@ -74,16 +74,19 @@ export class SupervisorService {
    */
   async getMatrix() {
     const [personnel, devices, assignments] = await Promise.all([
-      this.personnelRepo.find({
-        where: { isActive: true },
-        order: { firstName: 'ASC', lastName: 'ASC' },
-        take: 200,
-      }),
-      this.deviceRepo.find({
-        where: { isActive: true },
-        relations: ['location'],
-        order: { name: 'ASC' },
-      }),
+      this.personnelRepo
+        .createQueryBuilder('p')
+        .where('p.isActive = :a', { a: true })
+        .orderBy('p.firstName COLLATE "tr-TR-x-icu"', 'ASC')
+        .addOrderBy('p.lastName COLLATE "tr-TR-x-icu"', 'ASC')
+        .take(200)
+        .getMany(),
+      this.deviceRepo
+        .createQueryBuilder('d')
+        .leftJoinAndSelect('d.location', 'location')
+        .where('d.isActive = :a', { a: true })
+        .orderBy('d.name COLLATE "tr-TR-x-icu"', 'ASC')
+        .getMany(),
       this.personnelDeviceRepo.find(),
     ]);
 

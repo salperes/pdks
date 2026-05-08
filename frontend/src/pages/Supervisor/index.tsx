@@ -314,7 +314,7 @@ export const SupervisorPage = () => {
       }
       groups.get(locName)!.devices.push(d);
     }
-    return Array.from(groups.values()).sort((a, b) => a.locationName.localeCompare(b.locationName));
+    return Array.from(groups.values()).sort((a, b) => a.locationName.localeCompare(b.locationName, 'tr'));
   }, [devices, locations]);
 
   // Already assigned device IDs for selected personnel (single mode only)

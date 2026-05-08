@@ -32,8 +32,8 @@ export class QueryService {
           (p.firstName || ' ' || p.lastName) ILIKE :term)`,
         { term },
       )
-      .orderBy('p.lastName', 'ASC')
-      .addOrderBy('p.firstName', 'ASC')
+      .orderBy('p.lastName COLLATE "tr-TR-x-icu"', 'ASC')
+      .addOrderBy('p.firstName COLLATE "tr-TR-x-icu"', 'ASC')
       .take(50)
       .getMany();
 

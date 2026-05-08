@@ -191,6 +191,39 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 062
+Rev. Date  : 09.05.2026
+Rev. Time  : 15:13:00
+Rev. Prompt: Turkce karakterli isimler siralamada listenin sonuna dusuyordu (S/I/C/O/U/G)
+
+Rev. Report: (
+  PostgreSQL default collation Turkce karakterleri (S/I/C/O/U/G) Latin
+  alfabesinin sonuna koyuyordu. Tum SQL ORDER BY'larina ICU Turkce
+  collation eklendi: `COLLATE "tr-TR-x-icu"`. Container Postgres 16 ICU ile
+  geliyor (zaten mevcut). Frontend'de bir yerde 'tr' locale eksikti, eklendi.
+
+  BACKEND — TR collation eklenen ORDER BY'lar:
+  - personnel.service.ts (findAll allowedSort + exportCsv)
+  - query.service.ts (searchByPerson)
+  - reports.service.ts (getDailyAttendance, getMonthlySummary)
+  - supervisor.service.ts (getAssignments, getMatrix)
+  - locations.service.ts (findAll)
+
+  TypeORM `find({ order: ... })` formati COLLATE destegi vermediginden
+  ilgili cagrilar QueryBuilder'a cevrildi.
+
+  FRONTEND:
+  - pages/Supervisor/index.tsx:317 — locationName.localeCompare(b, 'tr')
+    parametresi eklendi (digerleri zaten 'tr' kullanmaktaydi).
+
+  Etki: Personel listesi, supervisor matrisi, gunluk/aylik raporlar, kart/
+  isim aramasi, lokasyon dropdown'lari — hepsinde Turkce siralama dogru.
+  "Sevgi" Latin alfabesindeki yerinde, "Sukran" S'den sonra, "Ihsan" I'dan
+  sonra siralanir.
+
+  Degisen dosyalar: 7 (5 backend + 1 frontend + CHANGELOG + version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 061
 Rev. Date  : 09.05.2026
 Rev. Time  : 15:01:00

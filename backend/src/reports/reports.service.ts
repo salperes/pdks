@@ -177,10 +177,12 @@ export class ReportsService {
     const dayEnd = new Date(`${dateStr}T23:59:59.999${globalCfg.tzStr}`);
 
     const [allPersonnel, logs] = await Promise.all([
-      this.personnelRepo.find({
-        where: { isActive: true },
-        order: { firstName: 'ASC', lastName: 'ASC' },
-      }),
+      this.personnelRepo
+        .createQueryBuilder('p')
+        .where('p.isActive = :a', { a: true })
+        .orderBy('p.firstName COLLATE "tr-TR-x-icu"', 'ASC')
+        .addOrderBy('p.lastName COLLATE "tr-TR-x-icu"', 'ASC')
+        .getMany(),
       this.logRepo
         .createQueryBuilder('log')
         .where('log.personnelId IS NOT NULL')
@@ -251,10 +253,12 @@ export class ReportsService {
     const workDays = workDaysInMonth(year, month);
 
     const [allPersonnel, logs] = await Promise.all([
-      this.personnelRepo.find({
-        where: { isActive: true },
-        order: { firstName: 'ASC', lastName: 'ASC' },
-      }),
+      this.personnelRepo
+        .createQueryBuilder('p')
+        .where('p.isActive = :a', { a: true })
+        .orderBy('p.firstName COLLATE "tr-TR-x-icu"', 'ASC')
+        .addOrderBy('p.lastName COLLATE "tr-TR-x-icu"', 'ASC')
+        .getMany(),
       this.logRepo
         .createQueryBuilder('log')
         .where('log.personnelId IS NOT NULL')
