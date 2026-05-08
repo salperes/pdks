@@ -172,16 +172,16 @@ export class ReconcileService {
         expectedUidSet.add(uid);
       }
 
-      // 3. Cihazda olmayan beklenenler → push (öncesinde duplicate cardno temizliği)
+      // 3. Her expected user için:
+      //    a) Aynı cardno cihazda farklı uid'de varsa → sil (exp.uid cihazda olsa
+      //       bile, çünkü Fabrika 2'de uid=164 + uid=546 ikisi birden olabilir).
+      //    b) exp.uid cihazda yoksa → push.
       for (const exp of expected) {
-        if (deviceUidSet.has(exp.uid)) continue;
         const name = `${exp.personnel.firstName} ${exp.personnel.lastName}`.substring(0, 24);
         const cardno = parseInt(exp.personnel.cardNumber ?? '0', 10) || 0;
         const userIdOnDevice = exp.personnel.employeeId ?? String(exp.uid);
 
-        // Aynı cardno cihazda farklı uid'de kayıtlıysa (eski ZKAccess kalıntısı vb.)
-        // önce o duplicate'leri sil. Aksi halde cihaz kart okurken küçük uid'i
-        // match'leyip "Tanımsız" loglar.
+        // a) Duplicate cardno temizliği (her durumda)
         if (cardno > 0) {
           const duplicates = deviceUsers.filter(
             (u) => u.cardno === cardno && u.uid !== exp.uid,
@@ -200,6 +200,9 @@ export class ReconcileService {
             }
           }
         }
+
+        // b) exp.uid cihazda zaten varsa push gerek yok
+        if (deviceUidSet.has(exp.uid)) continue;
 
         try {
           await this.zktecoClient.setUser(zk, exp.uid, name, cardno, userIdOnDevice);

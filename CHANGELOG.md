@@ -191,6 +191,33 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 061
+Rev. Date  : 09.05.2026
+Rev. Time  : 15:01:00
+Rev. Prompt: Reconcile duplicate-cardno: exp.uid cihazda olsa bile duplicate'leri kontrol et
+
+Rev. Report: (
+  Rev 060'taki duplicate-cardno mantigi exp.uid cihazda zaten varsa hic
+  calismiyordu. Kullanici "Esitle" basinca "Fabrika 2: 0 eklendi, 0 silindi"
+  goruyordu. Cunku Fabrika 2'de Abdulsamet uid=164 zaten kayitliydi
+  (PDKS push etmisti) ve uid=546 ZKAccess kalintisi ayrica vardi —
+  exp.uid=164 mevcut → continue → uid=546 hic kontrol edilmedi.
+
+  BACKEND — reconcile.service.ts:
+  - Duplicate-cardno kontrolu artik "if (deviceUidSet.has(exp.uid)) continue"
+    kontrolunden ONCE. Yani exp.uid cihazda olsa bile (PDKS push'i basariyla
+    yapmis) ayni cardno baska uid'lerde varsa onlar yine silinir.
+  - Push (setUser) hala continue sonrasinda — gereksiz tekrar push yapilmaz.
+
+  Akis duzeltme:
+    eski: 1) exp.uid var mi → varsa atla
+          2) (atlandiginda) duplicate kontrolu de atlandi
+    yeni: 1) duplicate cardno temizligi (her durumda)
+          2) exp.uid yoksa setUser
+
+  Degisen dosyalar: 3 (reconcile.service.ts, CHANGELOG.md, version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 060
 Rev. Date  : 09.05.2026
 Rev. Time  : 14:53:00
