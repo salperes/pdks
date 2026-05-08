@@ -259,6 +259,18 @@ export const SupervisorPage = () => {
     }
   }, [selectedPersonnelId, isBulkMode, fetchAssignments]);
 
+  // Tab değişince aktif görünümün verisini yeniden çek (matris ve personel
+  // bazlı sekmeler arasinda tutarsizlik olmasin: bir sekmedeki aksiyon digerini
+  // güncelse bile sekme degisiminde her zaman taze veri gosterilir).
+  useEffect(() => {
+    if (activeTab === 'matrix') {
+      fetchMatrix();
+    } else if (activeTab === 'personnel' && selectedPersonnelId && !isBulkMode) {
+      fetchAssignments(selectedPersonnelId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   // Close location dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {

@@ -191,6 +191,30 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 063
+Rev. Date  : 09.05.2026
+Rev. Time  : 15:20:00
+Rev. Prompt: Erisim Yonetimi: Personel Bazli ile Matris Gorunumu sync olmuyor
+
+Rev. Report: (
+  Tab degisiminde aktif sekmenin verisi yeniden cekilmiyordu. Kullanici
+  Matris'te aksiyon yapip Personel Bazli'ya gectiginde (veya tersi) eski
+  veri gorunebiliyordu. Aksiyon handler'lari sekmelerden birini guncelliyor
+  ama digerine gecince stale state.
+
+  FRONTEND — pages/Supervisor/index.tsx:
+  - Yeni useEffect: activeTab degisince
+    * matrix sekmesi → fetchMatrix()
+    * personnel sekmesi + personel secili + bulk degil → fetchAssignments(id)
+  Bu sayede sekmeden sekmeye gecince hep taze veri gorulur.
+
+  Diger handler'lar (handleAssignDevices, handleAssignLocation, handleUnassign,
+  handleMatrixCellClick) zaten ilgili refresh'leri yapiyordu — bunlara
+  dokunulmadi.
+
+  Degisen dosyalar: 3 (Supervisor/index.tsx, CHANGELOG.md, version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 062
 Rev. Date  : 09.05.2026
 Rev. Time  : 15:13:00
