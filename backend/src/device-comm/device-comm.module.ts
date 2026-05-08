@@ -6,6 +6,7 @@ import { DeviceManagerService } from './device-manager.service';
 import { SyncService } from './sync.service';
 import { ReconcileService } from './reconcile.service';
 import { ReconcileController } from './reconcile.controller';
+import { FactoryResetController } from './factory-reset.controller';
 import { EmailModule } from '../email/email.module';
 
 @Global()
@@ -14,7 +15,7 @@ import { EmailModule } from '../email/email.module';
     TypeOrmModule.forFeature([Device, AccessLog, Personnel, SyncHistory, SystemSettings, PersonnelDevice]),
     EmailModule,
   ],
-  controllers: [ReconcileController],
+  controllers: [ReconcileController, FactoryResetController],
   providers: [ZktecoClientService, DeviceManagerService, SyncService, ReconcileService],
   exports: [ZktecoClientService, DeviceManagerService, SyncService, ReconcileService],
 })

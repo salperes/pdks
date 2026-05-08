@@ -191,6 +191,58 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 060
+Rev. Date  : 09.05.2026
+Rev. Time  : 14:53:00
+Rev. Prompt: Reconcile duplicate-cardno + Cihazi Sifirla & Yeniden Yukle
+
+Rev. Report: (
+  Saha tanisi: Abdulsamet OZCAN (kart 4253004) Fabrika 2'de "Tanimsiz - Kart
+  #546" olarak loglaniyordu. Sebep cihazda eski ZKAccess'ten kalma uid=546
+  + PDKS'in push ettigi uid=164 ayni cardno'ya iki kez kayitli. ZKTeco kucuk
+  uid'i match'liyor → "Tanimsiz". Ayni tablo Fabrika 2'de uid 83/796/2576/
+  2759 icin de var. Reconcile (Rev 057) "bilinmeyen uid'lere dokunma" kurali
+  nedeniyle bu duplicate'leri silmiyordu.
+
+  BACKEND — reconcile.service.ts (duplicate-cardno detection):
+  - reconcileDevice() push donusunde: PDKS expected user push edilirken o
+    cardno cihazda farkli uid'de varsa once duplicate'ler silinir, sonra
+    setUser yapilir. result.deleted artar.
+
+  BACKEND — reconcile.service.ts (factoryResetAndReload):
+  - Yeni method: cihazi sifirdan kurar
+    1) SyncService.syncDevice ile kalan loglari PDKS'e cek (veri kaybi yok)
+    2) getUsers + her uid icin deleteUser
+    3) clearAttendanceLog
+    4) personnel_devices ∩ personnel.isActive icin tek tek setUser
+    5) result: syncedLogs, cleared, attendanceCleared, pushed, failed, errors
+  - SyncService forwardRef ile inject (devre baglilik)
+
+  BACKEND — factory-reset.controller.ts (YENI):
+  - POST /api/v1/device-comm/factory-reset/:deviceId (admin only)
+  - Cihazi bul, factoryResetAndReload cagir, sonucu don
+
+  BACKEND — device-comm.module.ts:
+  - FactoryResetController controllers'a eklendi
+
+  FRONTEND — Settings/Sistem.tsx (Cihaz Sifirla & Yeniden Yukle bolumu):
+  - Cihaz dropdown (GET /devices'tan listelenir)
+  - Kirmizi "Cihazi Sifirla & Yukle" butonu (RotateCcw + AlertTriangle)
+  - 2-asamali onay:
+    1) confirm: islem geri alinamaz uyarisi
+    2) prompt: cihaz adini AYNEN yazma zorunlulugu
+  - Sonuc toast: "X log alindi, Y kullanici silindi, Z kullanici yuklendi"
+
+  Issue #1, #3'un kalan vakalari (eski ZKAccess kalintilari) cozulmus oldu.
+  Yeni cihazlar ekleyince ayni senaryo bir defa "Esitle" ile temizlenir.
+
+  Degisen dosyalar: 6
+  Backend: 3 (reconcile.service.ts, factory-reset.controller.ts YENI,
+    device-comm.module.ts)
+  Frontend: 1 (Sistem.tsx)
+  Diger: CHANGELOG.md, version.ts
+)
+---------------------------------------------------------
 Rev. ID    : 059
 Rev. Date  : 02.05.2026
 Rev. Time  : 08:20:00

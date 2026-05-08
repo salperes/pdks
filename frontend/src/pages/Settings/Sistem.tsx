@@ -14,6 +14,8 @@ import {
   HardDrive,
   ToggleLeft,
   ToggleRight,
+  AlertTriangle,
+  RotateCcw,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { formatDateTimeSec } from '../../utils/date';
@@ -77,6 +79,10 @@ export const SettingsSistemPage = () => {
   const [backupHistoryLoading, setBackupHistoryLoading] = useState(true);
   const [dbBackupLoading, setDbBackupLoading] = useState(false);
 
+  const [resetDevices, setResetDevices] = useState<{ id: string; name: string }[]>([]);
+  const [resetDeviceId, setResetDeviceId] = useState('');
+  const [resetting, setResetting] = useState(false);
+
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastCounter = useRef(0);
 
@@ -118,11 +124,65 @@ export const SettingsSistemPage = () => {
     setBackupHistoryLoading(false);
   }, []);
 
+  const fetchDevices = useCallback(async () => {
+    try {
+      const res = await api.get('/devices');
+      const list = (Array.isArray(res.data) ? res.data : []).map((d: any) => ({
+        id: d.id,
+        name: d.name,
+      }));
+      setResetDevices(list);
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     fetchSettings();
     fetchSysInfo();
     fetchBackupHistory();
-  }, [fetchSettings, fetchSysInfo, fetchBackupHistory]);
+    fetchDevices();
+  }, [fetchSettings, fetchSysInfo, fetchBackupHistory, fetchDevices]);
+
+  const handleFactoryReset = async () => {
+    const device = resetDevices.find((d) => d.id === resetDeviceId);
+    if (!device) {
+      addToast('Önce bir cihaz seçin.', 'error');
+      return;
+    }
+    if (!confirm(
+      `"${device.name}" cihazındaki TÜM kullanıcı kayıtları ve geçiş logları silinecek, ` +
+      `ardından PDKS'teki atamalar sıfırdan yüklenecek. Bu işlem geri alınamaz.\n\nDevam edilsin mi?`,
+    )) return;
+
+    const typed = prompt(
+      `Onaylamak için cihaz adını AYNEN yazın:\n\n${device.name}`,
+    );
+    if (typed !== device.name) {
+      addToast('Cihaz adı eşleşmedi, işlem iptal edildi.', 'error');
+      return;
+    }
+
+    setResetting(true);
+    try {
+      const res = await api.post(`/device-comm/factory-reset/${device.id}`);
+      const r = res.data ?? {};
+      if (!r.reachable) {
+        addToast(`${device.name}: Cihaza erişilemedi.`, 'error');
+      } else {
+        const summary =
+          `${r.syncedLogs ?? 0} log alındı, ${r.cleared ?? 0} kullanıcı silindi, ` +
+          `${r.pushed ?? 0} kullanıcı yüklendi` +
+          (r.failed ? `, ${r.failed} hata` : '');
+        addToast(`${device.name}: ${summary}`, r.failed ? 'error' : 'success');
+      }
+    } catch (err: any) {
+      addToast(
+        `Cihaz sıfırlama başarısız: ${err?.response?.data?.message ?? 'hata'}`,
+        'error',
+      );
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const handleBackup = async () => {
     setBackupLoading(true);
@@ -427,6 +487,58 @@ export const SettingsSistemPage = () => {
               </table>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* ====== Cihaz Sıfırla & Yeniden Yükle ====== */}
+      <div className={cardClass}>
+        <div className="flex items-center gap-2 mb-4">
+          <AlertTriangle className="w-5 h-5 text-red-600" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Cihaz Sıfırla & Yeniden Yükle
+          </h2>
+        </div>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          Seçili cihazdaki <strong>tüm kullanıcı kayıtları ve geçiş logları silinir</strong>,
+          PDKS'teki atamalar tek seferde yeniden yüklenir. Yeni kurulum, başka uygulamadan
+          (örn. ZKAccess) kalan eski kayıtların temizliği veya kart-uid karışıklıklarının
+          tek vuruşta kapanması için kullanılır. Silmeden önce cihazdaki güncel loglar
+          PDKS'e çekilir, veri kaybı yaşanmaz.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+              Cihaz
+            </label>
+            <select
+              value={resetDeviceId}
+              onChange={(e) => setResetDeviceId(e.target.value)}
+              className={inputClass}
+              disabled={resetting}
+              title="Sıfırlanacak cihaz"
+              aria-label="Sıfırlanacak cihaz"
+            >
+              <option value="">Cihaz seçiniz...</option>
+              {resetDevices.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={handleFactoryReset}
+            disabled={!resetDeviceId || resetting}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {resetting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RotateCcw className="w-4 h-4" />
+            )}
+            {resetting ? 'Sıfırlanıyor...' : 'Cihazı Sıfırla & Yükle'}
+          </button>
         </div>
       </div>
 

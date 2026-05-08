@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, forwardRef, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cron } from '@nestjs/schedule';
 import { Device, Personnel, PersonnelDevice } from '../entities';
 import { ZktecoClientService } from './zkteco-client.service';
+import { SyncService } from './sync.service';
 
 export interface DeviceReconcileResult {
   deviceId: string;
@@ -36,6 +37,8 @@ export class ReconcileService {
     @InjectRepository(PersonnelDevice)
     private readonly personnelDeviceRepo: Repository<PersonnelDevice>,
     private readonly zktecoClient: ZktecoClientService,
+    @Inject(forwardRef(() => SyncService))
+    private readonly syncService: SyncService,
   ) {}
 
   /**
@@ -169,12 +172,35 @@ export class ReconcileService {
         expectedUidSet.add(uid);
       }
 
-      // 3. Cihazda olmayan beklenenler → push
+      // 3. Cihazda olmayan beklenenler → push (öncesinde duplicate cardno temizliği)
       for (const exp of expected) {
         if (deviceUidSet.has(exp.uid)) continue;
         const name = `${exp.personnel.firstName} ${exp.personnel.lastName}`.substring(0, 24);
         const cardno = parseInt(exp.personnel.cardNumber ?? '0', 10) || 0;
         const userIdOnDevice = exp.personnel.employeeId ?? String(exp.uid);
+
+        // Aynı cardno cihazda farklı uid'de kayıtlıysa (eski ZKAccess kalıntısı vb.)
+        // önce o duplicate'leri sil. Aksi halde cihaz kart okurken küçük uid'i
+        // match'leyip "Tanımsız" loglar.
+        if (cardno > 0) {
+          const duplicates = deviceUsers.filter(
+            (u) => u.cardno === cardno && u.uid !== exp.uid,
+          );
+          for (const dup of duplicates) {
+            try {
+              await this.zktecoClient.deleteUser(zk, dup.uid);
+              deviceUidSet.delete(dup.uid);
+              result.deleted++;
+              this.logger.log(
+                `[${device.name}] DELETE duplicate uid=${dup.uid} (cardno=${cardno} also assigned to uid=${exp.uid})`,
+              );
+            } catch (err: any) {
+              result.failed++;
+              result.errors.push(`dup-delete ${dup.uid}: ${err?.message ?? err}`);
+            }
+          }
+        }
+
         try {
           await this.zktecoClient.setUser(zk, exp.uid, name, cardno, userIdOnDevice);
           exp.assignment.status = 'enrolled';
@@ -224,6 +250,145 @@ export class ReconcileService {
           result.errors.push(`delete ${u.uid}: ${err?.message ?? err}`);
         }
       }
+    } finally {
+      if (zk) {
+        try {
+          await this.zktecoClient.disconnect(zk);
+        } catch {
+          /* ignore */
+        }
+      }
+      result.durationMs = Date.now() - t0;
+    }
+
+    return result;
+  }
+
+  /**
+   * Cihazı sıfırlayıp PDKS'ten temiz başlatma:
+   *   1) Önce kalan logları SyncService ile PDKS'e çek (veri kaybı önlemek için)
+   *   2) Cihazdaki tüm user'ları getUsers ile bul, her uid için deleteUser
+   *   3) clearAttendanceLog ile geçiş loglarını temizle
+   *   4) PDKS'in beklediği tüm enrollments'ı tek tek setUser
+   * "Sıfırdan yeniden başlat" senaryosu için: yeni kurulum, ZKAccess kalıntı
+   * temizliği, vb. — destructive ama atamaların restore eder.
+   */
+  async factoryResetAndReload(device: Device): Promise<{
+    deviceId: string;
+    deviceName: string;
+    reachable: boolean;
+    syncedLogs: number;
+    cleared: number;
+    attendanceCleared: boolean;
+    pushed: number;
+    failed: number;
+    errors: string[];
+    durationMs: number;
+  }> {
+    const t0 = Date.now();
+    const result = {
+      deviceId: device.id,
+      deviceName: device.name,
+      reachable: false,
+      syncedLogs: 0,
+      cleared: 0,
+      attendanceCleared: false,
+      pushed: 0,
+      failed: 0,
+      errors: [] as string[],
+      durationMs: 0,
+    };
+
+    // 1. Veri kaybını önlemek için silmeden önce logları çek
+    try {
+      const syncResult = await this.syncService.syncDevice(device);
+      result.syncedLogs = syncResult.recordsSynced ?? 0;
+      this.logger.log(
+        `[${device.name}] factory-reset: pre-sync ${result.syncedLogs} log çekildi`,
+      );
+    } catch (err: any) {
+      // Log gelmezse de devam — kullanıcı bilinçli sıfırlıyor
+      this.logger.warn(
+        `[${device.name}] factory-reset pre-sync hatası: ${err?.message ?? err}`,
+      );
+      result.errors.push(`pre-sync: ${err?.message ?? err}`);
+    }
+
+    let zk: any;
+    try {
+      zk = await this.zktecoClient.connect(device.ipAddress, device.port, device.commKey);
+      result.reachable = true;
+    } catch (err: any) {
+      result.errors.push(`Cihaza bağlanılamadı: ${err?.message ?? err}`);
+      result.durationMs = Date.now() - t0;
+      this.logger.error(`[${device.name}] factory-reset bağlantı hatası: ${err?.message ?? err}`);
+      return result;
+    }
+
+    try {
+      // 2. Cihazdaki tüm user'ları sil
+      let deviceUsers: Array<{ uid: number }> = [];
+      try {
+        const got: any = await this.zktecoClient.getUsers(zk);
+        const arr = Array.isArray(got) ? got : got?.data ?? [];
+        deviceUsers = arr.filter((u: any) => u && typeof u.uid === 'number');
+      } catch (err: any) {
+        result.errors.push(`getUsers başarısız: ${err?.message ?? err}`);
+      }
+      for (const u of deviceUsers) {
+        try {
+          await this.zktecoClient.deleteUser(zk, u.uid);
+          result.cleared++;
+        } catch (err: any) {
+          result.failed++;
+          result.errors.push(`delete uid=${u.uid}: ${err?.message ?? err}`);
+        }
+      }
+      this.logger.log(`[${device.name}] factory-reset: ${result.cleared} user silindi`);
+
+      // 3. Geçiş loglarını temizle
+      try {
+        await this.zktecoClient.clearAttendanceLog(zk);
+        result.attendanceCleared = true;
+        this.logger.log(`[${device.name}] factory-reset: attendance log temizlendi`);
+      } catch (err: any) {
+        result.errors.push(`clearAttendanceLog: ${err?.message ?? err}`);
+      }
+
+      // 4. PDKS'in beklediği user listesini push et
+      const assignments = await this.personnelDeviceRepo.find({
+        where: { deviceId: device.id },
+      });
+      const personnelIds = assignments.map((a) => a.personnelId);
+      const personnelList =
+        personnelIds.length > 0 ? await this.personnelRepo.findByIds(personnelIds) : [];
+      const personnelById = new Map(personnelList.map((p) => [p.id, p]));
+
+      for (const a of assignments) {
+        const p = personnelById.get(a.personnelId);
+        if (!p || !p.isActive) continue;
+        const uid = parseInt(p.employeeId ?? '', 10);
+        if (isNaN(uid) || uid < 1 || uid > 99999) continue;
+
+        const name = `${p.firstName} ${p.lastName}`.substring(0, 24);
+        const cardno = parseInt(p.cardNumber ?? '0', 10) || 0;
+        const userIdOnDevice = p.employeeId ?? String(uid);
+
+        try {
+          await this.zktecoClient.setUser(zk, uid, name, cardno, userIdOnDevice);
+          a.status = 'enrolled';
+          a.errorMessage = null;
+          await this.personnelDeviceRepo.save(a);
+          result.pushed++;
+        } catch (err: any) {
+          a.status = 'failed';
+          a.errorMessage = (err?.message ?? 'factory-reset push').substring(0, 500);
+          await this.personnelDeviceRepo.save(a);
+          result.failed++;
+          result.errors.push(`push uid=${uid}: ${err?.message ?? err}`);
+        }
+      }
+      this.logger.log(`[${device.name}] factory-reset: ${result.pushed} user push edildi`);
     } finally {
       if (zk) {
         try {
