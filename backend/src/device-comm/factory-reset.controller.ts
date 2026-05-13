@@ -10,8 +10,9 @@ import { ReconcileService } from './reconcile.service';
 
 /**
  * Cihaz sıfırlama uç noktası — destructive operasyon.
- * Cihazdaki tüm user kayıtları + geçiş logları silinir, PDKS'teki atamalar
- * tek seferde push edilir. Sadece admin kullanıcı erişebilir.
+ *   - POST /factory-reset/:deviceId       → sıfırla + PDKS'ten re-push
+ *   - POST /factory-reset/:deviceId/wipe  → yalnız sıfırla (cihazı boş bırak)
+ * Sadece admin kullanıcı erişebilir.
  */
 @Controller('device-comm/factory-reset')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -23,10 +24,19 @@ export class FactoryResetController {
     private readonly deviceRepo: Repository<Device>,
   ) {}
 
+  /** Sıfırla + PDKS'ten re-push */
   @Post(':deviceId')
-  async factoryReset(@Param('deviceId') deviceId: string) {
+  async factoryResetAndReload(@Param('deviceId') deviceId: string) {
     const device = await this.deviceRepo.findOne({ where: { id: deviceId } });
     if (!device) throw new NotFoundException('Cihaz bulunamadı');
-    return this.reconcileService.factoryResetAndReload(device);
+    return this.reconcileService.factoryReset(device, { reload: true });
+  }
+
+  /** Yalnız sıfırla — kullanıcı/log silinir, push yapılmaz */
+  @Post(':deviceId/wipe')
+  async wipeOnly(@Param('deviceId') deviceId: string) {
+    const device = await this.deviceRepo.findOne({ where: { id: deviceId } });
+    if (!device) throw new NotFoundException('Cihaz bulunamadı');
+    return this.reconcileService.factoryReset(device, { reload: false });
   }
 }

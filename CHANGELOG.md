@@ -191,6 +191,37 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 064
+Rev. Date  : 09.05.2026
+Rev. Time  : 18:24:00
+Rev. Prompt: Admin > Sistem'e 'Cihaz Sifirla' (sadece sifirla, push yok) butonu
+
+Rev. Report: (
+  Mevcut "Cihaz Sifirla & Yeniden Yukle" (re-push'lu) yanina ikinci buton:
+  "Sadece Sifirla". Cihaz user/log silinir, PDKS push YAPILMAZ. DB
+  personnel_devices atamalari 'pending' durumuna duser, sonradan Esitle
+  butonuyla manuel yuklenebilir.
+
+  BACKEND — reconcile.service.ts:
+  - factoryResetAndReload(device) → factoryReset(device, opts: { reload })
+    olarak yeniden adlandirildi. opts.reload default true (geriye uyum).
+  - reload=false durumunda re-push adimi atlanir; personnel_devices'a tek
+    bir UPDATE ile { status: 'pending' } yazilir.
+
+  BACKEND — factory-reset.controller.ts:
+  - POST /:deviceId        → factoryReset(device, { reload: true })  (eski)
+  - POST /:deviceId/wipe   → factoryReset(device, { reload: false }) (yeni)
+
+  FRONTEND — Settings/Sistem.tsx:
+  - handleFactoryReset() → runFactoryReset(mode: 'reload' | 'wipe')
+  - Iki buton: kirmizi 'Sifirla & Yukle' + outline-red 'Sadece Sifirla'
+  - 2-asamali onay (confirm + cihaz adi prompt) ikisinde de aktif
+  - Mod'a gore farkli sonuc toast'i (reload: "X yuklendi", wipe: "cihaz bos")
+
+  Degisen dosyalar: 5 (reconcile.service.ts, factory-reset.controller.ts,
+    Sistem.tsx, CHANGELOG, version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 063
 Rev. Date  : 09.05.2026
 Rev. Time  : 15:20:00

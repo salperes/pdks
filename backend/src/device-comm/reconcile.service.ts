@@ -268,15 +268,19 @@ export class ReconcileService {
   }
 
   /**
-   * Cihazı sıfırlayıp PDKS'ten temiz başlatma:
+   * Cihazı sıfırla. İki mod:
+   *   - `reload=true` (default): sıfırla + PDKS'ten re-push (eski "factoryResetAndReload")
+   *   - `reload=false`: yalnız sıfırla (cihaz bom-boş; DB push yok)
+   * Akış:
    *   1) Önce kalan logları SyncService ile PDKS'e çek (veri kaybı önlemek için)
    *   2) Cihazdaki tüm user'ları getUsers ile bul, her uid için deleteUser
    *   3) clearAttendanceLog ile geçiş loglarını temizle
-   *   4) PDKS'in beklediği tüm enrollments'ı tek tek setUser
-   * "Sıfırdan yeniden başlat" senaryosu için: yeni kurulum, ZKAccess kalıntı
-   * temizliği, vb. — destructive ama atamaların restore eder.
+   *   4) (reload=true ise) PDKS'in beklediği tüm enrollments'ı tek tek setUser
    */
-  async factoryResetAndReload(device: Device): Promise<{
+  async factoryReset(
+    device: Device,
+    opts: { reload: boolean } = { reload: true },
+  ): Promise<{
     deviceId: string;
     deviceName: string;
     reachable: boolean;
@@ -358,40 +362,50 @@ export class ReconcileService {
         result.errors.push(`clearAttendanceLog: ${err?.message ?? err}`);
       }
 
-      // 4. PDKS'in beklediği user listesini push et
-      const assignments = await this.personnelDeviceRepo.find({
-        where: { deviceId: device.id },
-      });
-      const personnelIds = assignments.map((a) => a.personnelId);
-      const personnelList =
-        personnelIds.length > 0 ? await this.personnelRepo.findByIds(personnelIds) : [];
-      const personnelById = new Map(personnelList.map((p) => [p.id, p]));
+      // 4. (Opsiyonel) PDKS'in beklediği user listesini push et
+      if (opts.reload) {
+        const assignments = await this.personnelDeviceRepo.find({
+          where: { deviceId: device.id },
+        });
+        const personnelIds = assignments.map((a) => a.personnelId);
+        const personnelList =
+          personnelIds.length > 0 ? await this.personnelRepo.findByIds(personnelIds) : [];
+        const personnelById = new Map(personnelList.map((p) => [p.id, p]));
 
-      for (const a of assignments) {
-        const p = personnelById.get(a.personnelId);
-        if (!p || !p.isActive) continue;
-        const uid = parseInt(p.employeeId ?? '', 10);
-        if (isNaN(uid) || uid < 1 || uid > 99999) continue;
+        for (const a of assignments) {
+          const p = personnelById.get(a.personnelId);
+          if (!p || !p.isActive) continue;
+          const uid = parseInt(p.employeeId ?? '', 10);
+          if (isNaN(uid) || uid < 1 || uid > 99999) continue;
 
-        const name = `${p.firstName} ${p.lastName}`.substring(0, 24);
-        const cardno = parseInt(p.cardNumber ?? '0', 10) || 0;
-        const userIdOnDevice = p.employeeId ?? String(uid);
+          const name = `${p.firstName} ${p.lastName}`.substring(0, 24);
+          const cardno = parseInt(p.cardNumber ?? '0', 10) || 0;
+          const userIdOnDevice = p.employeeId ?? String(uid);
 
-        try {
-          await this.zktecoClient.setUser(zk, uid, name, cardno, userIdOnDevice);
-          a.status = 'enrolled';
-          a.errorMessage = null;
-          await this.personnelDeviceRepo.save(a);
-          result.pushed++;
-        } catch (err: any) {
-          a.status = 'failed';
-          a.errorMessage = (err?.message ?? 'factory-reset push').substring(0, 500);
-          await this.personnelDeviceRepo.save(a);
-          result.failed++;
-          result.errors.push(`push uid=${uid}: ${err?.message ?? err}`);
+          try {
+            await this.zktecoClient.setUser(zk, uid, name, cardno, userIdOnDevice);
+            a.status = 'enrolled';
+            a.errorMessage = null;
+            await this.personnelDeviceRepo.save(a);
+            result.pushed++;
+          } catch (err: any) {
+            a.status = 'failed';
+            a.errorMessage = (err?.message ?? 'factory-reset push').substring(0, 500);
+            await this.personnelDeviceRepo.save(a);
+            result.failed++;
+            result.errors.push(`push uid=${uid}: ${err?.message ?? err}`);
+          }
         }
+        this.logger.log(`[${device.name}] factory-reset: ${result.pushed} user push edildi`);
+      } else {
+        // reload=false: DB'deki personnel_devices kayıtlarını 'pending' yap
+        // (cihazda artık yok; gerçeği yansıt). Sonraki Eşitle'de yeniden push edilir.
+        await this.personnelDeviceRepo.update(
+          { deviceId: device.id },
+          { status: 'pending', errorMessage: null },
+        );
+        this.logger.log(`[${device.name}] wipe-only: re-push atlandı (reload=false)`);
       }
-      this.logger.log(`[${device.name}] factory-reset: ${result.pushed} user push edildi`);
     } finally {
       if (zk) {
         try {

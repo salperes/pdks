@@ -142,15 +142,20 @@ export const SettingsSistemPage = () => {
     fetchDevices();
   }, [fetchSettings, fetchSysInfo, fetchBackupHistory, fetchDevices]);
 
-  const handleFactoryReset = async () => {
+  const runFactoryReset = async (mode: 'reload' | 'wipe') => {
     const device = resetDevices.find((d) => d.id === resetDeviceId);
     if (!device) {
       addToast('Önce bir cihaz seçin.', 'error');
       return;
     }
+
+    const tailMsg =
+      mode === 'reload'
+        ? `silinecek, ardından PDKS'teki atamalar sıfırdan yüklenecek`
+        : `silinecek (cihaz boş kalacak; PDKS push yapılmayacak)`;
     if (!confirm(
-      `"${device.name}" cihazındaki TÜM kullanıcı kayıtları ve geçiş logları silinecek, ` +
-      `ardından PDKS'teki atamalar sıfırdan yüklenecek. Bu işlem geri alınamaz.\n\nDevam edilsin mi?`,
+      `"${device.name}" cihazındaki TÜM kullanıcı kayıtları ve geçiş logları ` +
+      `${tailMsg}. Bu işlem geri alınamaz.\n\nDevam edilsin mi?`,
     )) return;
 
     const typed = prompt(
@@ -163,15 +168,23 @@ export const SettingsSistemPage = () => {
 
     setResetting(true);
     try {
-      const res = await api.post(`/device-comm/factory-reset/${device.id}`);
+      const url =
+        mode === 'reload'
+          ? `/device-comm/factory-reset/${device.id}`
+          : `/device-comm/factory-reset/${device.id}/wipe`;
+      const res = await api.post(url);
       const r = res.data ?? {};
       if (!r.reachable) {
         addToast(`${device.name}: Cihaza erişilemedi.`, 'error');
       } else {
         const summary =
-          `${r.syncedLogs ?? 0} log alındı, ${r.cleared ?? 0} kullanıcı silindi, ` +
-          `${r.pushed ?? 0} kullanıcı yüklendi` +
-          (r.failed ? `, ${r.failed} hata` : '');
+          mode === 'reload'
+            ? `${r.syncedLogs ?? 0} log alındı, ${r.cleared ?? 0} kullanıcı silindi, ` +
+              `${r.pushed ?? 0} kullanıcı yüklendi` +
+              (r.failed ? `, ${r.failed} hata` : '')
+            : `${r.syncedLogs ?? 0} log alındı, ${r.cleared ?? 0} kullanıcı silindi, ` +
+              `cihaz boş` +
+              (r.failed ? `, ${r.failed} hata` : '');
         addToast(`${device.name}: ${summary}`, r.failed ? 'error' : 'success');
       }
     } catch (err: any) {
@@ -490,21 +503,29 @@ export const SettingsSistemPage = () => {
         </div>
       </div>
 
-      {/* ====== Cihaz Sıfırla & Yeniden Yükle ====== */}
+      {/* ====== Cihaz Sıfırla ====== */}
       <div className={cardClass}>
         <div className="flex items-center gap-2 mb-4">
           <AlertTriangle className="w-5 h-5 text-red-600" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Cihaz Sıfırla & Yeniden Yükle
+            Cihaz Sıfırla
           </h2>
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          Seçili cihazdaki <strong>tüm kullanıcı kayıtları ve geçiş logları silinir</strong>,
-          PDKS'teki atamalar tek seferde yeniden yüklenir. Yeni kurulum, başka uygulamadan
-          (örn. ZKAccess) kalan eski kayıtların temizliği veya kart-uid karışıklıklarının
-          tek vuruşta kapanması için kullanılır. Silmeden önce cihazdaki güncel loglar
-          PDKS'e çekilir, veri kaybı yaşanmaz.
+          Seçili cihazdaki <strong>tüm kullanıcı kayıtları ve geçiş logları silinir</strong>.
+          Silmeden önce cihazdaki güncel loglar PDKS'e çekilir, veri kaybı yaşanmaz.
         </p>
+        <ul className="text-xs text-gray-500 dark:text-gray-400 mb-4 space-y-1 list-disc pl-5">
+          <li>
+            <strong>Sıfırla & Yükle:</strong> sıfırladıktan sonra PDKS'teki atamalar
+            cihaza yeniden yüklenir (yeni kurulum / ZKAccess kalıntı temizliği).
+          </li>
+          <li>
+            <strong>Sadece Sıfırla:</strong> cihazı boş bırakır (PDKS push yok).
+            DB atamaları "pending" durumuna düşer, sonra <em>Eşitle</em>
+            butonuyla manuel yüklenebilir.
+          </li>
+        </ul>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[200px]">
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
@@ -528,7 +549,7 @@ export const SettingsSistemPage = () => {
           </div>
           <button
             type="button"
-            onClick={handleFactoryReset}
+            onClick={() => runFactoryReset('reload')}
             disabled={!resetDeviceId || resetting}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -537,7 +558,20 @@ export const SettingsSistemPage = () => {
             ) : (
               <RotateCcw className="w-4 h-4" />
             )}
-            {resetting ? 'Sıfırlanıyor...' : 'Cihazı Sıfırla & Yükle'}
+            {resetting ? 'İşleniyor...' : 'Sıfırla & Yükle'}
+          </button>
+          <button
+            type="button"
+            onClick={() => runFactoryReset('wipe')}
+            disabled={!resetDeviceId || resetting}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {resetting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <AlertTriangle className="w-4 h-4" />
+            )}
+            {resetting ? 'İşleniyor...' : 'Sadece Sıfırla'}
           </button>
         </div>
       </div>
