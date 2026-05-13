@@ -154,11 +154,16 @@ export class DevicesController {
       const usersPayload = await this.zktecoClient.getUsers(zk);
       const attendancePayload = await this.zktecoClient.getAttendances(zk);
 
-      // Cihaz saati (getTime başarısız olabilir — sessiz hata)
+      // Cihaz saati: zkteco-js TR local saatini UTC sanarak Date döndürür.
+      // Gerçek UTC'ye çevirmek için TR offset'ini (3 saat) çıkar — UI lokal
+      // (browser TZ) gösterimde tekrar TR'ye dönüşür.
       let deviceTime: string | null = null;
       try {
         const t = await this.zktecoClient.getTime(zk);
-        deviceTime = t instanceof Date ? t.toISOString() : t ? new Date(t).toISOString() : null;
+        const raw = t instanceof Date ? t : t ? new Date(t) : null;
+        if (raw && !isNaN(raw.getTime())) {
+          deviceTime = new Date(raw.getTime() - 3 * 60 * 60 * 1000).toISOString();
+        }
       } catch {
         /* atla */
       }

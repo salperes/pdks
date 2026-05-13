@@ -191,6 +191,36 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 067
+Rev. Date  : 13.05.2026
+Rev. Time  : 18:59:00
+Rev. Prompt: Cihaz Bilgisi modal'inda deviceTime UTC offset hatasi: cihaz +3saat goruluyordu
+
+Rev. Report: (
+  Rev 066'da eklenen deviceTime sahada 3 saat ileri gosteriyordu. zkteco-js
+  library getTime() cihazin yerel TR saatini UTC sanarak Date objesi
+  donduruyor. Pull endpoint'te dogrudan t.toISOString() yapinca UTC olarak
+  serialize ediliyor; UI lokal (browser TR) gosterimde tekrar +3 ekleyince
+  6 saat ileri gozukmesi gerekirdi ama UI sadece bir kez +3 yaparak kullanici
+  21:56 gordu (cihaz dogru) iken sunucu 18:56 (dogru UTC) goruldu — fark
+  hesabi yanlis 10793s cikti.
+
+  Sync'teki checkAndSyncTime zaten dogru offset uyguluyor:
+    deviceUtcMs = deviceTime.getTime() - TURKEY_OFFSET_MS
+
+  Pull endpoint de ayni offset'i uygulayacak sekilde duzeltildi.
+
+  BACKEND — devices.controller.ts pullDeviceData:
+  - getTime sonucu raw Date alindi, getTime() - 3h = real UTC ms
+  - new Date(realUtcMs).toISOString() → deviceTime ISO (gercek UTC)
+  - UI formatDateTime (browser TR locale) → 21:56 lokal gosterir, dogru
+
+  Sonuc: cihaz saati ve sunucu saati ayni yerel saat dilimi gosterir; fark
+  sadece gercek saat sapmasi kadardir.
+
+  Degisen dosyalar: 3 (devices.controller.ts, CHANGELOG.md, version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 066
 Rev. Date  : 13.05.2026
 Rev. Time  : 18:52:00
