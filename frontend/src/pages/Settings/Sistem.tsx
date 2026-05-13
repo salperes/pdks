@@ -83,6 +83,13 @@ export const SettingsSistemPage = () => {
   const [resetDeviceId, setResetDeviceId] = useState('');
   const [resetting, setResetting] = useState(false);
 
+  const [tsScanning, setTsScanning] = useState(false);
+  const [tsDeleting, setTsDeleting] = useState(false);
+  const [tsScanResult, setTsScanResult] = useState<{
+    scanned: number;
+    perDevice: Array<{ deviceName: string | null; count: number }>;
+  } | null>(null);
+
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastCounter = useRef(0);
 
@@ -141,6 +148,53 @@ export const SettingsSistemPage = () => {
     fetchBackupHistory();
     fetchDevices();
   }, [fetchSettings, fetchSysInfo, fetchBackupHistory, fetchDevices]);
+
+  const handleScanInvalidTs = async () => {
+    setTsScanning(true);
+    try {
+      const res = await api.post('/access-logs/cleanup-invalid-timestamps', { dryRun: true });
+      const r = res.data ?? {};
+      setTsScanResult({ scanned: r.scanned ?? 0, perDevice: r.perDevice ?? [] });
+      if (r.scanned === 0) {
+        addToast('Bozuk timestamp\'li kayıt bulunamadı.', 'success');
+      } else {
+        addToast(`${r.scanned} bozuk kayıt bulundu (silmek için "Sil" butonu).`, 'success');
+      }
+    } catch (err: any) {
+      addToast(
+        `Tarama başarısız: ${err?.response?.data?.message ?? 'hata'}`,
+        'error',
+      );
+    } finally {
+      setTsScanning(false);
+    }
+  };
+
+  const handleDeleteInvalidTs = async () => {
+    if (!tsScanResult || tsScanResult.scanned === 0) {
+      addToast('Önce "Tara" ile etkilenecek kayıt sayısını görün.', 'error');
+      return;
+    }
+    if (!confirm(
+      `${tsScanResult.scanned} adet bozuk timestamp'li kayıt silinecek (geri alınamaz).\n\n` +
+      `Bu kayıtlar cihaz saati hatalıyken oluştuğu için raporlarda günlere yanlış dağılıyor.\n\nDevam edilsin mi?`,
+    )) return;
+
+    setTsDeleting(true);
+    try {
+      const res = await api.post('/access-logs/cleanup-invalid-timestamps', { dryRun: false });
+      const r = res.data ?? {};
+      addToast(`${r.deleted ?? 0} bozuk kayıt silindi.`, 'success');
+      setTsScanResult({ scanned: 0, perDevice: [] });
+    } catch (err: any) {
+      addToast(
+        `Silme başarısız: ${err?.response?.data?.message ?? 'hata'}`,
+        'error',
+      );
+    } finally {
+      setTsDeleting(false);
+    }
+  };
 
   const runFactoryReset = async (mode: 'reload' | 'wipe') => {
     const device = resetDevices.find((d) => d.id === resetDeviceId);
@@ -501,6 +555,56 @@ export const SettingsSistemPage = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ====== Bozuk Timestamp Temizliği ====== */}
+      <div className={cardClass}>
+        <div className="flex items-center gap-2 mb-4">
+          <AlertTriangle className="w-5 h-5 text-amber-600" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Bozuk Timestamp Temizliği
+          </h2>
+        </div>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          Cihaz saati hatalıyken (sıfırlanmış / ileri atmış dönemlerde) DB'ye kaydedilmiş
+          geçiş loglarını tespit eder ve siler. Kapsam: <strong>1 saatten fazla gelecek</strong>
+          {' '}veya <strong>7 yıldan eski</strong> kayıtlar. Bu kayıtlar raporlarda
+          günlere yanlış dağılıp toplamları bozar.
+        </p>
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <button
+            type="button"
+            onClick={handleScanInvalidTs}
+            disabled={tsScanning || tsDeleting}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+          >
+            {tsScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+            {tsScanning ? 'Taranıyor...' : 'Tara'}
+          </button>
+          <button
+            type="button"
+            onClick={handleDeleteInvalidTs}
+            disabled={!tsScanResult || tsScanResult.scanned === 0 || tsDeleting || tsScanning}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {tsDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
+            {tsDeleting ? 'Siliniyor...' : `Sil${tsScanResult && tsScanResult.scanned > 0 ? ` (${tsScanResult.scanned})` : ''}`}
+          </button>
+        </div>
+        {tsScanResult && tsScanResult.perDevice.length > 0 && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+            <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-2">
+              Tespit edilen bozuk kayıtlar (cihaz bazında):
+            </p>
+            <ul className="text-xs text-amber-700 dark:text-amber-400 space-y-0.5">
+              {tsScanResult.perDevice.map((d, i) => (
+                <li key={i}>
+                  <strong>{d.deviceName ?? '(silinmiş cihaz)'}:</strong> {d.count} kayıt
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* ====== Cihaz Sıfırla ====== */}

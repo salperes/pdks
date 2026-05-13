@@ -169,6 +169,18 @@ export class SyncService {
       syncRecord.completedAt = new Date();
       await this.syncHistoryRepository.save(syncRecord);
 
+      // Opt-in: cihaz attendance buffer'ı yığılmasın diye temizle.
+      // DB'de ham loglar zaten saklı; cihaz boşaltılınca sonraki sync hızlanır.
+      // Sadece logs.length > 0 ise dene (boş cihazda boşa CMD gönderme).
+      if (device.autoCleanupLogs && logs.length > 0) {
+        try {
+          await this.zktecoClient.clearAttendanceLog(zk);
+          this.logger.log(`${device.name}: attendance buffer temizlendi (${logs.length} kayıt cihazdan silindi)`);
+        } catch (err: any) {
+          this.logger.warn(`${device.name}: attendance buffer temizliği başarısız: ${err?.message}`);
+        }
+      }
+
       return { recordsSynced };
     } catch (error) {
       syncRecord.status = 'failed';
@@ -236,9 +248,12 @@ export class SyncService {
       eventTime = new Date();
     }
 
-    // Skip records with clearly invalid dates (before 2000 or far future)
-    const year = eventTime.getFullYear();
-    if (year < 2000 || year > new Date().getFullYear() + 1) {
+    // Saat hatası olan kayıtları reddet: 1 saatten fazla gelecek
+    // veya 7 yıldan fazla geçmiş. Cihaz saati sıfırlanmış / ileri atmış
+    // dönemlerden kalma kayıtlar DB'ye yazılmaz.
+    const nowMs = Date.now();
+    const eventMs = eventTime.getTime();
+    if (eventMs > nowMs + 3600_000 || eventMs < nowMs - 7 * 365 * 86400_000) {
       return false;
     }
 

@@ -436,6 +436,52 @@ export class AccessLogsService {
   }
 
   /**
+   * Cihaz saati hatalıyken kaydedilmiş bozuk timestamp'li logları temizler:
+   *   - event_time > NOW() + 1 saat  → cihaz saati ileri atmış dönemden
+   *   - event_time < NOW() - 7 yıl   → cihaz saati epoch/sıfır dönemden
+   * dryRun=true ise sadece kaç kayıt etkilenir döner, silmez.
+   */
+  async cleanupInvalidTimestamps(
+    dryRun = true,
+  ): Promise<{ scanned: number; perDevice: Array<{ deviceName: string | null; count: number }>; deleted: number }> {
+    const whereClause =
+      `(event_time > NOW() + INTERVAL '1 hour' OR event_time < NOW() - INTERVAL '7 years')`;
+
+    const countRow: Array<{ total: string }> = await this.accessLogsRepository.query(
+      `SELECT COUNT(*) AS total FROM access_logs WHERE ${whereClause}`,
+    );
+    const total = parseInt(countRow[0]?.total ?? '0', 10) || 0;
+
+    const perDeviceRows: Array<{ device_name: string | null; cnt: string }> =
+      await this.accessLogsRepository.query(
+        `SELECT d.name AS device_name, COUNT(*)::text AS cnt
+         FROM access_logs al LEFT JOIN devices d ON d.id = al.device_id
+         WHERE ${whereClause}
+         GROUP BY d.name
+         ORDER BY COUNT(*) DESC`,
+      );
+    const perDevice = perDeviceRows.map((r) => ({
+      deviceName: r.device_name,
+      count: parseInt(r.cnt, 10) || 0,
+    }));
+
+    let deleted = 0;
+    if (!dryRun && total > 0) {
+      const result = await this.accessLogsRepository
+        .createQueryBuilder()
+        .delete()
+        .where(
+          `event_time > NOW() + INTERVAL '1 hour' OR event_time < NOW() - INTERVAL '7 years'`,
+        )
+        .execute();
+      deleted = result.affected ?? 0;
+      this.logger.log(`cleanupInvalidTimestamps: ${deleted} kayıt silindi`);
+    }
+
+    return { scanned: total, perDevice, deleted };
+  }
+
+  /**
    * Her lokasyondaki bugünkü en son kart geçişine göre personel sayısı.
    * Türev modelde "kişi son olarak hangi lokasyonda okutmuşsa orada sayılır";
    * bu dashboard / anlık doluluk görünümü için yeterli yaklaşım.

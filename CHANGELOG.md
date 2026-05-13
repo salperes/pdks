@@ -191,6 +191,58 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 065
+Rev. Date  : 13.05.2026
+Rev. Time  : 18:44:00
+Rev. Prompt: Cihaz-DB log tutarsizligi: A) sikilastirma B) DB temizlik C) cihaz oto-temizlik
+
+Rev. Report: (
+  Tanı: 4.Ar-Ge'de 212 kayit 2001-2019 + 12 kayit 2027 (gelecek), Fabrika 2'de
+  3 kayit 1999-2007. Cihaz saati hatalı dönemlerde gelmis kayitlar DB'ye
+  yazilmis. Ayrica cihazlarda 1300-5500 attendance log birikmis (clear hic
+  yapilmiyor), her sync'te tum log set'i cekilip dedup yapiliyordu.
+
+  A) BACKEND — Timestamp filtre sikilastirma:
+  - sync.service.ts: year-bazli filtre yerine zaman-bazli:
+    eventMs > NOW+1h OR eventMs < NOW-7y → reject
+  - adms.service.ts: ayni filtre
+  → Yeni kayitlar artik kirli timestamp ile DB'ye girmez.
+
+  B) BACKEND — Bozuk kayit temizlik:
+  - access-logs.service.ts: cleanupInvalidTimestamps(dryRun)
+    * dryRun: scanned + perDevice breakdown
+    * dryRun=false: DELETE WHERE event_time > NOW+1h OR < NOW-7y
+  - access-logs.controller.ts: POST /access-logs/cleanup-invalid-timestamps
+    (admin only, audit-logged)
+
+  B) FRONTEND — Settings/Sistem.tsx:
+  - Yeni bolum: "Bozuk Timestamp Temizligi"
+  - "Tara" butonu → dryRun=true, sonuc toast + cihaz-bazli liste
+  - "Sil" butonu → confirm + dryRun=false → silinen sayi toast
+  - Tara sonucu acik amber kart icinde gosterilir
+
+  C) BACKEND — Cihaz log oto-temizlik (opt-in):
+  - device.entity.ts: yeni alan autoCleanupLogs:boolean (default false)
+  - create-device.dto.ts: autoCleanupLogs eklendi
+  - sync.service.ts: sync basarili + logs.length>0 + device.autoCleanupLogs
+    → clearAttendanceLog cagrilir. Cihaz buffer'i yiginlanmaz.
+
+  C) FRONTEND — Devices form:
+  - DeviceFormData/EMPTY_FORM'a autoCleanupLogs eklendi
+  - openEditModal device.autoCleanupLogs yuklenir
+  - handleSave payload'a autoCleanupLogs eklenir
+  - types/index.ts Device interface guncellendi
+  - Comm Key altina checkbox: "Log otomatik temizligi" + aciklama
+
+  Test akisi:
+  1. Settings > Sistem > Bozuk Timestamp > Tara → 215 etkilenecek
+  2. Sil → temizlenir
+  3. Cihazlar > 4.Ar-Ge > Duzenle > "Log otomatik temizligi" tikle Kaydet
+  4. Sonraki sync'te cihaz buffer'i temizlenir, ileride birikme olmaz
+
+  Degisen dosyalar: 8 backend + 3 frontend + CHANGELOG + version.ts
+)
+---------------------------------------------------------
 Rev. ID    : 064
 Rev. Date  : 09.05.2026
 Rev. Time  : 18:24:00

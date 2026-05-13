@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, IsUUID, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsUUID, IsEnum, IsBoolean } from 'class-validator';
 import { DeviceDirection } from '../../entities';
 
 export class CreateDeviceDto {
@@ -27,4 +27,8 @@ export class CreateDeviceDto {
   @IsString()
   @IsOptional()
   commKey?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  autoCleanupLogs?: boolean;
 }

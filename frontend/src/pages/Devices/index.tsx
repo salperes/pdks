@@ -16,6 +16,7 @@ interface DeviceFormData {
   direction: 'in' | 'out' | 'both';
   serialNumber: string;
   commKey: string;
+  autoCleanupLogs: boolean;
 }
 
 interface Toast {
@@ -32,6 +33,7 @@ const EMPTY_FORM: DeviceFormData = {
   direction: 'in',
   serialNumber: '',
   commKey: '',
+  autoCleanupLogs: false,
 };
 
 const DIRECTION_LABELS: Record<Device['direction'], string> = {
@@ -171,6 +173,7 @@ export const DevicesPage = () => {
       direction: device.direction,
       serialNumber: device.serialNumber ?? '',
       commKey: device.commKey ?? '',
+      autoCleanupLogs: device.autoCleanupLogs ?? false,
     });
     setModalOpen(true);
   };
@@ -197,6 +200,7 @@ export const DevicesPage = () => {
       port: form.port,
       direction: form.direction,
       locationId: form.locationId || null,
+      autoCleanupLogs: form.autoCleanupLogs,
     };
     if (form.serialNumber.trim()) payload.serialNumber = form.serialNumber.trim();
     if (form.commKey.trim()) payload.commKey = form.commKey.trim();
@@ -731,6 +735,27 @@ export const DevicesPage = () => {
                   placeholder="Opsiyonel (örnek: 202212)"
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0078d4] focus:border-transparent outline-none"
                 />
+              </div>
+
+              {/* Auto cleanup logs */}
+              <div className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
+                <input
+                  type="checkbox"
+                  id="autoCleanupLogs"
+                  checked={form.autoCleanupLogs}
+                  onChange={(e) => setForm((f) => ({ ...f, autoCleanupLogs: e.target.checked }))}
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#0078d4] focus:ring-[#0078d4]"
+                />
+                <label htmlFor="autoCleanupLogs" className="flex-1 cursor-pointer">
+                  <span className="block text-sm font-medium text-gray-900 dark:text-white">
+                    Log otomatik temizliği
+                  </span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Her başarılı sync'ten sonra cihazdaki attendance buffer temizlenir
+                    (clearAttendanceLog). PDKS DB'sinde ham loglar zaten saklı.
+                    Cihazda log yığını birikmesin diye önerilir.
+                  </span>
+                </label>
               </div>
             </div>
 

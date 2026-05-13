@@ -176,7 +176,11 @@ export class AdmsService {
 
     // Parse time: "2024-01-15 08:30:00" format
     const eventTime = new Date(timeStr);
-    if (isNaN(eventTime.getTime()) || eventTime.getFullYear() < 2000) {
+    if (isNaN(eventTime.getTime())) return false;
+    // Saat hatası filtresi: 1 saatten fazla gelecek veya 7 yıldan fazla geçmiş
+    const nowMs = Date.now();
+    const eventMs = eventTime.getTime();
+    if (eventMs > nowMs + 3600_000 || eventMs < nowMs - 7 * 365 * 86400_000) {
       return false;
     }
 

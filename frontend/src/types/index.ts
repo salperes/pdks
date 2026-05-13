@@ -85,6 +85,7 @@ export interface Device {
   isOnline: boolean;
   lastSyncAt?: string;
   isActive: boolean;
+  autoCleanupLogs?: boolean;
 }
 
 export interface AccessLog {

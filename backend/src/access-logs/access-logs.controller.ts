@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Delete,
+  Post,
   Query,
   Body,
   UseGuards,
@@ -60,6 +61,30 @@ export class AccessLogsController {
       targetEntity: 'AccessLog',
       details: { count: result.deleted },
     });
+    return result;
+  }
+
+  /**
+   * Bozuk timestamp'li kayıtları tara (dryRun=true) veya sil (dryRun=false).
+   * Kapsam: event_time > NOW() + 1 saat (gelecek) veya NOW() - 7 yıl (çok eski).
+   */
+  @Post('cleanup-invalid-timestamps')
+  @Roles(UserRole.ADMIN)
+  async cleanupInvalidTimestamps(
+    @CurrentUser() me: AuthUser,
+    @Body() body: { dryRun?: boolean },
+  ) {
+    const dryRun = body?.dryRun !== false;
+    const result = await this.accessLogsService.cleanupInvalidTimestamps(dryRun);
+    if (!dryRun && result.deleted > 0) {
+      this.auditLogService.log({
+        action: 'CLEANUP_INVALID_TIMESTAMPS',
+        userId: me.id,
+        username: me.username,
+        targetEntity: 'AccessLog',
+        details: { deleted: result.deleted, perDevice: result.perDevice },
+      });
+    }
     return result;
   }
 }

@@ -57,6 +57,14 @@ export class Device {
   @Column({ type: 'boolean', default: true, name: 'is_active' })
   isActive: boolean;
 
+  /**
+   * true ise her başarılı sync'ten sonra cihazdaki attendance buffer'ı temizlenir
+   * (clearAttendanceLog). Cihaz log yığını birikmesin diye opt-in özellik.
+   * PDKS'in DB'sinde ham loglar zaten dedup ile saklanır.
+   */
+  @Column({ type: 'boolean', default: false, name: 'auto_cleanup_logs' })
+  autoCleanupLogs: boolean;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
