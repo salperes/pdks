@@ -811,6 +811,45 @@ export const DevicesPage = () => {
                 </div>
               )}
 
+              {/* Cihaz saati */}
+              {(pullData.deviceTime || pullData.serverTime) && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Saat</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div className="flex flex-col gap-0.5 p-2 rounded-lg bg-gray-50 dark:bg-gray-700/40 border border-gray-200 dark:border-gray-700">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Cihaz Saati</span>
+                      <span className="font-mono text-gray-900 dark:text-white">
+                        {pullData.deviceTime ? formatDateTime(pullData.deviceTime) : '-'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-0.5 p-2 rounded-lg bg-gray-50 dark:bg-gray-700/40 border border-gray-200 dark:border-gray-700">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Sunucu Saati</span>
+                      <span className="font-mono text-gray-900 dark:text-white">
+                        {pullData.serverTime ? formatDateTime(pullData.serverTime) : '-'}
+                      </span>
+                    </div>
+                  </div>
+                  {pullData.deviceTime && pullData.serverTime && (() => {
+                    const drift = Math.round(
+                      (new Date(pullData.deviceTime).getTime() - new Date(pullData.serverTime).getTime()) / 1000,
+                    );
+                    const absDrift = Math.abs(drift);
+                    const color =
+                      absDrift < 30
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : absDrift < 300
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : 'text-red-600 dark:text-red-400';
+                    return (
+                      <p className={`text-xs mt-1.5 ${color}`}>
+                        Fark: {drift > 0 ? '+' : ''}{drift} saniye
+                        {absDrift > 60 && ' (sync sırasında otomatik düzeltilir)'}
+                      </p>
+                    );
+                  })()}
+                </div>
+              )}
+
               {/* Capacity */}
               {pullData.counts && (
                 <div>
@@ -836,11 +875,15 @@ export const DevicesPage = () => {
               {pullData.samples?.users?.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                    Kullanıcılar (ilk {pullData.samples.users.length})
+                    Kullanıcılar ({pullData.samples.users.length}
+                    {pullData.counts?.users != null && pullData.counts.users !== pullData.samples.users.length
+                      ? ` / ${pullData.counts.users}`
+                      : ''}
+                    )
                   </h3>
-                  <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 max-h-[40vh] overflow-y-auto">
                     <table className="w-full text-xs">
-                      <thead className="bg-gray-50 dark:bg-gray-900/40">
+                      <thead className="bg-gray-50 dark:bg-gray-900/40 sticky top-0">
                         <tr>
                           <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">UID</th>
                           <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">Ad</th>
@@ -867,27 +910,34 @@ export const DevicesPage = () => {
               {pullData.samples?.attendances?.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                    Son Kayıtlar (ilk {pullData.samples.attendances.length})
+                    Son Kayıtlar (en yeni {pullData.samples.attendances.length}
+                    {pullData.counts?.attendances != null && pullData.counts.attendances !== pullData.samples.attendances.length
+                      ? ` / ${pullData.counts.attendances}`
+                      : ''}
+                    )
                   </h3>
-                  <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 max-h-[40vh] overflow-y-auto">
                     <table className="w-full text-xs">
-                      <thead className="bg-gray-50 dark:bg-gray-900/40">
+                      <thead className="bg-gray-50 dark:bg-gray-900/40 sticky top-0">
                         <tr>
                           <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">UID</th>
-                          <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">Tarih/Saat</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">Tarih/Saat (cihaz)</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {pullData.samples.attendances.map((a: any, i: number) => (
-                          <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                            <td className="px-3 py-1.5 text-gray-900 dark:text-white font-mono">{a.uid ?? a.userId ?? '-'}</td>
-                            <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300 font-mono">
-                              {a.timestamp
-                                ? formatDateTime(a.timestamp)
-                                : '-'}
-                            </td>
-                          </tr>
-                        ))}
+                        {pullData.samples.attendances.map((a: any, i: number) => {
+                          const ts = a.record_time ?? a.recordTime ?? a.timestamp;
+                          return (
+                            <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                              <td className="px-3 py-1.5 text-gray-900 dark:text-white font-mono">
+                                {a.user_id ?? a.userId ?? a.uid ?? '-'}
+                              </td>
+                              <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300 font-mono">
+                                {ts ? formatDateTime(ts) : '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

@@ -143,7 +143,8 @@ export class DevicesController {
     @Query('logsLimit') logsLimitRaw?: string,
   ) {
     const device = await this.devicesService.findById(id);
-    const usersLimit = this.normalizeLimit(usersLimitRaw, 10, 1000);
+    // Default: tüm kullanıcılar (10k cap) + son 50 log
+    const usersLimit = this.normalizeLimit(usersLimitRaw, 10000, 10000);
     const logsLimit = this.normalizeLimit(logsLimitRaw, 50, 5000);
 
     let zk: any;
@@ -153,8 +154,24 @@ export class DevicesController {
       const usersPayload = await this.zktecoClient.getUsers(zk);
       const attendancePayload = await this.zktecoClient.getAttendances(zk);
 
+      // Cihaz saati (getTime başarısız olabilir — sessiz hata)
+      let deviceTime: string | null = null;
+      try {
+        const t = await this.zktecoClient.getTime(zk);
+        deviceTime = t instanceof Date ? t.toISOString() : t ? new Date(t).toISOString() : null;
+      } catch {
+        /* atla */
+      }
+
       const users = this.unwrapDataArray(usersPayload);
       const attendances = this.unwrapDataArray(attendancePayload);
+
+      // Son 50: tarihe göre yeniden eskiye sırala, en yenilerden N tane al
+      const sortedAttendances = [...attendances].sort((a: any, b: any) => {
+        const ta = new Date(a?.record_time ?? a?.recordTime ?? 0).getTime();
+        const tb = new Date(b?.record_time ?? b?.recordTime ?? 0).getTime();
+        return tb - ta;
+      });
 
       return {
         success: true,
@@ -165,13 +182,15 @@ export class DevicesController {
           port: device.port,
         },
         info,
+        deviceTime,
+        serverTime: new Date().toISOString(),
         counts: {
           users: users.length,
           attendances: attendances.length,
         },
         samples: {
           users: users.slice(0, usersLimit),
-          attendances: attendances.slice(0, logsLimit),
+          attendances: sortedAttendances.slice(0, logsLimit),
         },
       };
     } catch (error) {

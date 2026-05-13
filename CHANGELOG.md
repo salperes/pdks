@@ -191,6 +191,36 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 066
+Rev. Date  : 13.05.2026
+Rev. Time  : 18:52:00
+Rev. Prompt: Cihaz Bilgisi: tum kullanicilar, son 50 kayit, cihaz saati
+
+Rev. Report: (
+  "Cihaz Bilgisi" modal'i daha kapsamli oldu:
+  - Onceki: ilk 10 kullanici, ilk 5 kayit
+  - Yeni: tum kullanicilar (10k cap), en yeni 50 kayit, cihaz + sunucu saati
+
+  BACKEND — devices.controller.ts pullDeviceData:
+  - usersLimit default 10 → 10000 (max 10000)
+  - Attendances now sorted by record_time DESC, then sliced (son 50)
+  - getTime(zk) cagrilir (sessiz hata) → deviceTime ISO
+  - serverTime: yeni NOW().toISOString() eklendi
+
+  FRONTEND — Devices/index.tsx Cihaz Bilgisi modal:
+  - Yeni "Saat" bolumu: cihaz saati vs sunucu saati yan yana, fark gosterilir
+    (yesil <30s, amber <5dk, kirmizi >5dk)
+  - "Kullanicilar (N / M)" — M cihazda toplam, N gosterilen
+  - "Son Kayitlar (en yeni N / M)" — eski "ilk N" yanlis ifadesi duzeltildi
+  - Iki tablo max-h-[40vh] overflow-y-auto + sticky thead — uzun listede
+    kaymadan basliklar gorunur
+  - Attendance row ts fallback: record_time / recordTime / timestamp
+  - UID alani user_id / userId / uid fallback
+
+  Degisen dosyalar: 4 (devices.controller.ts, Devices/index.tsx,
+    CHANGELOG.md, version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 065
 Rev. Date  : 13.05.2026
 Rev. Time  : 18:44:00
