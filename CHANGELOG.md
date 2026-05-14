@@ -191,6 +191,61 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 068
+Rev. Date  : 14.05.2026
+Rev. Time  : 17:53:00
+Rev. Prompt: Cihaz Denetim modal'i: cihaz user listesi PDKS ile karsilastir + secici sil
+
+Rev. Report: (
+  4.Ar-Ge'de DB'de 117 atama varken cihazda 146 user durumu icin denetim
+  araci. Kullanici cihaz basinda 5 kategori liste gorur ve istedigini
+  cihazdan silebilir.
+
+  BACKEND — reconcile.service.ts:
+  - auditDevice(device): cihazdaki user listesini (getUsers) PDKS DB ile
+    karsilastir, 5 kategori don:
+    * matched:    cihazda + PDKS aktif + bu cihaza atanmis (saglikli)
+    * inactive:   cihazda + PDKS pasif (artik gecemez ama cihazda var)
+    * unassigned: cihazda + PDKS aktif ama bu cihaza atanmamis
+    * unknown:    cihazda + PDKS personel HIC yok (ZKAccess/admin kalintisi)
+    * missing:    PDKS atadi + aktif ama cihazda yok (push fail/silinmis)
+    Sonuc TR alfabetik sirali doner.
+  - deleteDeviceUids(device, uids[]): listede secili uid'leri cihazdan
+    deleteUser ile siler. personnel_devices kayitlarini da temizler.
+
+  BACKEND — audit.controller.ts (YENI):
+  - GET  /device-comm/audit/:deviceId          → audit raporu
+  - POST /device-comm/audit/:deviceId/delete-uids  → secili uid'leri sil
+  - Sadece admin (JwtAuth + Roles)
+
+  BACKEND — device-comm.module.ts:
+  - AuditController controllers'a eklendi
+
+  FRONTEND — Devices/index.tsx:
+  - Yeni "Denetim" butonu (amber, AlertTriangle ikonu) cihaz kartinda
+    Esitle yaninda
+  - Modal: 5 sekme (kategori bazli renkli badge'li sayilar)
+  - Aktif sekmedeki kayit tablosu (UID, Personel adi, Cihaz adi, Kart No,
+    Sicil)
+  - Pasif/Atanmamis/Yabanci sekmelerinde checkbox toplu secim
+  - "Secilenleri Cihazdan Sil" butonu (confirm + audit refresh)
+  - Eslesen ve Eksik sekmelerinde silme yok (sadece gosterge)
+  - Bos sekmede CheckCircle2 ikonu + "kayit yok" mesaji
+
+  Kullanim akisi (4.Ar-Ge ornegi):
+  1. Cihazlar > 4.Ar-Ge > Denetim
+  2. "Yabanci (PDKS'te yok)" sekmesinde 29 kayit gorulur — eski ZKAccess
+     kalintilari
+  3. "Tümünü seç" → "Secilenleri Cihazdan Sil"
+  4. Cihaz 146 → 117 user'a duser, PDKS ile birebir esitlenir
+
+  Degisen dosyalar: 5
+  Backend: 3 (reconcile.service.ts, audit.controller.ts YENI,
+    device-comm.module.ts)
+  Frontend: 1 (Devices/index.tsx)
+  Diger: CHANGELOG.md, version.ts
+)
+---------------------------------------------------------
 Rev. ID    : 067
 Rev. Date  : 13.05.2026
 Rev. Time  : 18:59:00

@@ -419,4 +419,204 @@ export class ReconcileService {
 
     return result;
   }
+
+  /**
+   * Cihazdaki user listesini PDKS DB ile karşılaştır, denetim raporu üret.
+   * Kategoriler:
+   *  - matched:    cihazda + PDKS personel aktif + bu cihaza atanmış (sağlıklı)
+   *  - inactive:   cihazda + PDKS personel pasif (artık geçemez ama cihazda)
+   *  - unassigned: cihazda + PDKS personel aktif AMA bu cihaza atanmamış
+   *  - unknown:    cihazda + PDKS personelinde HİÇ yok (ZKAccess/admin kalıntısı)
+   *  - missing:    PDKS bu cihaza atadı + personel aktif AMA cihazda yok (push fail)
+   */
+  async auditDevice(device: Device): Promise<{
+    deviceId: string;
+    deviceName: string;
+    reachable: boolean;
+    deviceUserCount: number;
+    counts: { matched: number; inactive: number; unassigned: number; unknown: number; missing: number };
+    matched: Array<{ uid: number; cardno: number; deviceName: string; personnelName: string; employeeId: string | null }>;
+    inactive: Array<{ uid: number; cardno: number; deviceName: string; personnelName: string; employeeId: string | null }>;
+    unassigned: Array<{ uid: number; cardno: number; deviceName: string; personnelName: string; employeeId: string | null }>;
+    unknown: Array<{ uid: number; cardno: number; deviceName: string }>;
+    missing: Array<{ uid: number; cardno: number; personnelName: string; employeeId: string | null }>;
+    errors: string[];
+  }> {
+    const result = {
+      deviceId: device.id,
+      deviceName: device.name,
+      reachable: false,
+      deviceUserCount: 0,
+      counts: { matched: 0, inactive: 0, unassigned: 0, unknown: 0, missing: 0 },
+      matched: [] as any[],
+      inactive: [] as any[],
+      unassigned: [] as any[],
+      unknown: [] as any[],
+      missing: [] as any[],
+      errors: [] as string[],
+    };
+
+    let zk: any;
+    try {
+      zk = await this.zktecoClient.connect(device.ipAddress, device.port, device.commKey);
+      result.reachable = true;
+    } catch (err: any) {
+      result.errors.push(`Cihaza bağlanılamadı: ${err?.message ?? err}`);
+      return result;
+    }
+
+    try {
+      let deviceUsers: Array<{ uid: number; cardno: number; name?: string }> = [];
+      try {
+        const got: any = await this.zktecoClient.getUsers(zk);
+        const arr = Array.isArray(got) ? got : got?.data ?? [];
+        deviceUsers = arr.filter((u: any) => u && typeof u.uid === 'number');
+      } catch (err: any) {
+        result.errors.push(`getUsers başarısız: ${err?.message ?? err}`);
+        return result;
+      }
+      result.deviceUserCount = deviceUsers.length;
+
+      // PDKS tarafı
+      const allPersonnel = await this.personnelRepo.find();
+      const personnelByUid = new Map<number, Personnel>();
+      for (const p of allPersonnel) {
+        const uid = parseInt(p.employeeId ?? '', 10);
+        if (!isNaN(uid) && uid >= 1 && uid <= 99999) personnelByUid.set(uid, p);
+      }
+
+      const assignments = await this.personnelDeviceRepo.find({
+        where: { deviceId: device.id },
+      });
+      const assignedPersonnelIds = new Set(assignments.map((a) => a.personnelId));
+
+      // Cihazdaki her uid için kategori belirle
+      const onDeviceUids = new Set<number>();
+      for (const u of deviceUsers) {
+        onDeviceUids.add(u.uid);
+        const p = personnelByUid.get(u.uid);
+        if (!p) {
+          result.unknown.push({ uid: u.uid, cardno: u.cardno ?? 0, deviceName: u.name ?? '' });
+          continue;
+        }
+        const personnelName = `${p.firstName} ${p.lastName}`.trim();
+        const row = {
+          uid: u.uid,
+          cardno: u.cardno ?? 0,
+          deviceName: u.name ?? '',
+          personnelName,
+          employeeId: p.employeeId,
+        };
+        if (!p.isActive) {
+          result.inactive.push(row);
+        } else if (!assignedPersonnelIds.has(p.id)) {
+          result.unassigned.push(row);
+        } else {
+          result.matched.push(row);
+        }
+      }
+
+      // PDKS bu cihaza atadı + aktif AMA cihazda yok = missing
+      for (const a of assignments) {
+        const p = allPersonnel.find((x) => x.id === a.personnelId);
+        if (!p || !p.isActive) continue;
+        const uid = parseInt(p.employeeId ?? '', 10);
+        if (isNaN(uid) || uid < 1 || uid > 99999) continue;
+        if (onDeviceUids.has(uid)) continue;
+        result.missing.push({
+          uid,
+          cardno: parseInt(p.cardNumber ?? '0', 10) || 0,
+          personnelName: `${p.firstName} ${p.lastName}`.trim(),
+          employeeId: p.employeeId,
+        });
+      }
+
+      result.counts = {
+        matched: result.matched.length,
+        inactive: result.inactive.length,
+        unassigned: result.unassigned.length,
+        unknown: result.unknown.length,
+        missing: result.missing.length,
+      };
+
+      // Türkçe sırala
+      const trCmp = (a: string, b: string) => a.localeCompare(b, 'tr');
+      result.matched.sort((a, b) => trCmp(a.personnelName, b.personnelName));
+      result.inactive.sort((a, b) => trCmp(a.personnelName, b.personnelName));
+      result.unassigned.sort((a, b) => trCmp(a.personnelName, b.personnelName));
+      result.unknown.sort((a, b) => a.uid - b.uid);
+      result.missing.sort((a, b) => trCmp(a.personnelName, b.personnelName));
+    } finally {
+      if (zk) {
+        try {
+          await this.zktecoClient.disconnect(zk);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Cihazdan belirtilen uid listesini siler. Audit modal'ından çağrılır.
+   * personnel_devices satırlarını da temizler (varsa).
+   */
+  async deleteDeviceUids(
+    device: Device,
+    uids: number[],
+  ): Promise<{ deleted: number; failed: number; errors: string[] }> {
+    const result = { deleted: 0, failed: 0, errors: [] as string[] };
+    if (!uids?.length) return result;
+
+    let zk: any;
+    try {
+      zk = await this.zktecoClient.connect(device.ipAddress, device.port, device.commKey);
+    } catch (err: any) {
+      result.errors.push(`Cihaza bağlanılamadı: ${err?.message ?? err}`);
+      result.failed = uids.length;
+      return result;
+    }
+
+    try {
+      // uid → personnel id mapping (varsa personnel_devices kaydını da sil)
+      const allPersonnel = await this.personnelRepo.find();
+      const personnelByUid = new Map<number, Personnel>();
+      for (const p of allPersonnel) {
+        const u = parseInt(p.employeeId ?? '', 10);
+        if (!isNaN(u) && u >= 1 && u <= 99999) personnelByUid.set(u, p);
+      }
+
+      for (const uid of uids) {
+        try {
+          await this.zktecoClient.deleteUser(zk, uid);
+          result.deleted++;
+          this.logger.log(`[${device.name}] audit-delete uid=${uid}`);
+        } catch (err: any) {
+          result.failed++;
+          result.errors.push(`uid=${uid}: ${err?.message ?? err}`);
+          continue;
+        }
+        // PDKS atama kaydı varsa temizle
+        const p = personnelByUid.get(uid);
+        if (p) {
+          await this.personnelDeviceRepo.delete({
+            deviceId: device.id,
+            personnelId: p.id,
+          });
+        }
+      }
+    } finally {
+      if (zk) {
+        try {
+          await this.zktecoClient.disconnect(zk);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
+    return result;
+  }
 }

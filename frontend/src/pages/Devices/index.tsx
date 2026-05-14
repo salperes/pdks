@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Cpu, Plus, Edit, Trash2, X, Wifi, WifiOff, RefreshCw, MapPin, Users, Info, Search } from 'lucide-react';
+import { Cpu, Plus, Edit, Trash2, X, Wifi, WifiOff, RefreshCw, MapPin, Users, Info, Search, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { api } from '../../services/api';
 import { formatDateTime } from '../../utils/date';
 import type { Device, Location } from '../../types';
@@ -101,6 +101,13 @@ export const DevicesPage = () => {
   const [deviceUsersData, setDeviceUsersData] = useState<any>(null);
   const [fetchingUsersIds, setFetchingUsersIds] = useState<Set<string>>(new Set());
   const [usersSearch, setUsersSearch] = useState('');
+
+  // Audit modal
+  const [auditData, setAuditData] = useState<any>(null);
+  const [auditingIds, setAuditingIds] = useState<Set<string>>(new Set());
+  const [auditSelected, setAuditSelected] = useState<Set<number>>(new Set());
+  const [auditTab, setAuditTab] = useState<'inactive' | 'unassigned' | 'unknown' | 'missing' | 'matched'>('unknown');
+  const [auditDeleting, setAuditDeleting] = useState(false);
 
   // Toast notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -278,6 +285,62 @@ export const DevicesPage = () => {
         next.delete(device.id);
         return next;
       });
+    }
+  };
+
+  const handleAudit = async (device: Device) => {
+    setAuditingIds((prev) => new Set(prev).add(device.id));
+    try {
+      const res = await api.get(`/device-comm/audit/${device.id}`);
+      const r = res.data ?? {};
+      if (!r.reachable) {
+        addToast(`${device.name}: Cihaza erişilemedi.`, 'error');
+        return;
+      }
+      setAuditData({ ...r, deviceName: r.deviceName ?? device.name });
+      setAuditSelected(new Set());
+      // İlk açılışta varsayılan tab — fazlalık varsa o, yoksa missing, yoksa matched
+      const c = r.counts ?? {};
+      const firstTab =
+        c.unknown > 0 ? 'unknown'
+        : c.unassigned > 0 ? 'unassigned'
+        : c.inactive > 0 ? 'inactive'
+        : c.missing > 0 ? 'missing'
+        : 'matched';
+      setAuditTab(firstTab);
+    } catch (err: any) {
+      addToast(`Denetim başarısız: ${err?.response?.data?.message ?? 'hata'}`, 'error');
+    } finally {
+      setAuditingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(device.id);
+        return next;
+      });
+    }
+  };
+
+  const handleAuditDeleteSelected = async () => {
+    if (!auditData || auditSelected.size === 0) return;
+    if (!confirm(
+      `${auditSelected.size} kullanıcı cihazdan silinecek. Bu işlem geri alınamaz.\n\nDevam edilsin mi?`,
+    )) return;
+    setAuditDeleting(true);
+    try {
+      const uids = Array.from(auditSelected);
+      const res = await api.post(`/device-comm/audit/${auditData.deviceId}/delete-uids`, { uids });
+      const r = res.data ?? {};
+      addToast(
+        `${r.deleted ?? 0} kullanıcı silindi${r.failed ? `, ${r.failed} hata` : ''}.`,
+        r.failed ? 'error' : 'success',
+      );
+      // Audit'i yenile
+      const refreshed = await api.get(`/device-comm/audit/${auditData.deviceId}`);
+      setAuditData({ ...refreshed.data, deviceName: auditData.deviceName });
+      setAuditSelected(new Set());
+    } catch (err: any) {
+      addToast(`Silme başarısız: ${err?.response?.data?.message ?? 'hata'}`, 'error');
+    } finally {
+      setAuditDeleting(false);
     }
   };
 
@@ -556,6 +619,15 @@ export const DevicesPage = () => {
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${reconcilingIds.has(device.id) ? 'animate-spin' : ''}`} />
                   Eşitle
+                </button>
+                <button
+                  onClick={() => handleAudit(device)}
+                  disabled={auditingIds.has(device.id)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors disabled:opacity-50"
+                  title="Cihazdaki user listesini PDKS ile karşılaştır, sorunlu kayıtları gör"
+                >
+                  <AlertTriangle className={`w-3.5 h-3.5 ${auditingIds.has(device.id) ? 'animate-pulse' : ''}`} />
+                  Denetim
                 </button>
                 <button
                   onClick={() => handleFetchUsers(device)}
@@ -957,6 +1029,177 @@ export const DevicesPage = () => {
           </div>
         </div>
       )}
+
+      {/* Audit Modal */}
+      {auditData && (() => {
+        const tabs: Array<{ key: typeof auditTab; label: string; count: number; color: string }> = [
+          { key: 'matched', label: 'Eşleşen', count: auditData.counts?.matched ?? 0, color: 'emerald' },
+          { key: 'inactive', label: 'Pasif Personel', count: auditData.counts?.inactive ?? 0, color: 'amber' },
+          { key: 'unassigned', label: 'Atanmamış', count: auditData.counts?.unassigned ?? 0, color: 'amber' },
+          { key: 'unknown', label: 'Yabancı (PDKS\'te yok)', count: auditData.counts?.unknown ?? 0, color: 'red' },
+          { key: 'missing', label: 'Eksik (cihazda yok)', count: auditData.counts?.missing ?? 0, color: 'gray' },
+        ];
+        const activeRows: any[] = auditData[auditTab] ?? [];
+        const canDelete = auditTab !== 'matched' && auditTab !== 'missing';
+        const toggleAll = (checked: boolean) => {
+          if (!checked) {
+            setAuditSelected(new Set());
+            return;
+          }
+          setAuditSelected(new Set(activeRows.map((r) => r.uid)));
+        };
+        const toggleOne = (uid: number) => {
+          setAuditSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(uid)) next.delete(uid);
+            else next.add(uid);
+            return next;
+          });
+        };
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setAuditData(null)} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {auditData.deviceName} — Denetim
+                  </h2>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    (cihazda {auditData.deviceUserCount} kullanıcı)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAuditData(null)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex gap-1 px-6 py-3 border-b border-gray-200 dark:border-gray-700 overflow-x-auto shrink-0">
+                {tabs.map((t) => {
+                  const active = auditTab === t.key;
+                  const colorMap: Record<string, string> = {
+                    emerald: 'border-emerald-500 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30',
+                    amber: 'border-amber-500 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30',
+                    red: 'border-red-500 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30',
+                    gray: 'border-gray-500 text-gray-700 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/30',
+                  };
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => { setAuditTab(t.key); setAuditSelected(new Set()); }}
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border whitespace-nowrap transition-colors ${
+                        active
+                          ? colorMap[t.color]
+                          : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/30'
+                      }`}
+                    >
+                      {t.label}
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${active ? 'bg-white/40 dark:bg-black/30' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                        {t.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Body */}
+              <div className="px-6 py-4 overflow-y-auto flex-1">
+                {activeRows.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-400 dark:text-gray-500">
+                    <CheckCircle2 className="w-12 h-12 mb-2" />
+                    <p className="text-sm">Bu kategoride kayıt yok.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 dark:bg-gray-900/40 sticky top-0">
+                        <tr>
+                          {canDelete && (
+                            <th className="w-8 px-2 py-2">
+                              <input
+                                type="checkbox"
+                                checked={auditSelected.size === activeRows.length && activeRows.length > 0}
+                                onChange={(e) => toggleAll(e.target.checked)}
+                                aria-label="Tümünü seç"
+                                className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                              />
+                            </th>
+                          )}
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">UID</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">Personel (PDKS)</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">Ad (cihaz)</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">Kart No</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 dark:text-gray-400">Sicil</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {activeRows.map((r: any, i: number) => (
+                          <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                            {canDelete && (
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="checkbox"
+                                  checked={auditSelected.has(r.uid)}
+                                  onChange={() => toggleOne(r.uid)}
+                                  aria-label={`uid ${r.uid} seç`}
+                                  className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                                />
+                              </td>
+                            )}
+                            <td className="px-3 py-1.5 text-gray-900 dark:text-white font-mono">{r.uid}</td>
+                            <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300">
+                              {r.personnelName || <span className="text-gray-400 italic">—</span>}
+                            </td>
+                            <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300">{r.deviceName || '-'}</td>
+                            <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300 font-mono">{r.cardno || '-'}</td>
+                            <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300 font-mono">{r.employeeId || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {canDelete && auditSelected.size > 0 && `${auditSelected.size} seçili`}
+                  {auditTab === 'missing' && 'Bu kayıtlar cihazda yok — Eşitle butonuyla push edilebilir'}
+                  {auditTab === 'matched' && 'Bu kayıtlar sağlıklı, müdahale gerekmez'}
+                </div>
+                <div className="flex items-center gap-2">
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={handleAuditDeleteSelected}
+                      disabled={auditSelected.size === 0 || auditDeleting}
+                      className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {auditDeleting ? 'Siliniyor...' : `Seçilenleri Cihazdan Sil (${auditSelected.size})`}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setAuditData(null)}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Kapat
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Device Users Modal */}
       {deviceUsersData && (() => {
