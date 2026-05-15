@@ -1,4 +1,12 @@
-1)	Sistemde kayıtlı ve yetki verilmiş olmasına rağmen bazı kartları sistem okuyabilmekte ancak geçiş yetkisi vermemektedir. (Bu sorunu “Erişim Yönetimi” sekmesinden “Personel Bazlı” sekmesine basıp ilgili personeli seçip aslında seçili/yetkili olmasına rağmen “Lokasyon Ata” sekmesine basıp yeniden “Fabrika” ve/veya “Teknokent”e basarak çözebiliyoruz. Birçok kullanıcıya bu şekilde yeniden yetki tanımı yaptık ancak kontrol edilmesinin faydalı olacağını düşünüyorum.
-2)	Sistemde kayıtlı bir kullanıcının kartını farklı ve/veya yeni bir kullanıcıya tanımladığımızda ilgili donanıma okutulduğunda eski/ilk kullanıcının bilgileri ile geçişe izin veriyor. (Yapılan değişikliklerin sistemden tüm donanımlara gönderilmesi/refresh edilmesi gibi bir opsiyon olacağı aklıma geldi. Kontrol edilmesinin faydalı olacağını düşünüyorum.
-3)	Bazı kullanıcıların sistemde kayıtlarının düzgün olmasına rağmen kartlarını donanıma okuttuklarında geçiş izni veriyor ancak “Geçiş Kayıtlarında” “Tanımsız” olarak geldiğini görüyoruz. (Tesadüfen farkettim ki ilgili kullanıcının “Erişim Yönetimi” sekmesinden yetkilerinin yeninden tanımladığımda sorun çözülüyor. (Bu tesadüf de olabilir, yine sistemde yetki ve kayıt yenileme sonrası otomatik refresh ve/veya tüm donanımlara update bilgisinin basılması gerektiği şeklinde bir yol izlenebileceğini düşünüyorum. Kontrol edilmesinin faydalı olacağını düşünüyorum.
-4)	Bazı kullanıcılar sistemden silindiğinde silinen kullanıcının kart numarasını sıfırdan farklı bir kullanıcıya tanımlamak istediğimde “kart numarası zaten kayıtlı” uyarısı alıyorum. Bu her zaman olmuyor belli kart numaralarında oluyor. (Örnek Kart No: 4353911)
+•	Alper PALANDÖKEN’e ait olan “3726032” numaralı personel kartı ile ilgili;
+Kaydı tamamen silip yeni kayıt oluşturma,
+Kayıt üzerinde düzenleme
+Kaydın sahip olduğu erişim yetkilerini kaldırıp yeniden verme
+
+İşlemlerini tamamı yapılmıştır. Mevcut durumda “Alper PALANDÖKNE” adlı kullanıcının;
+Kaydı sorunsuz olmakla birlikte yetkileri de tanımlanmış ve sorunsuz görünmekte olup Fabrika 2 cihazında kartı okutulduğunda “Teşekkürler” yanıtı alınıyor ve Ad-Soyad-ID sorunsuz görünüyor ancak “Geçiş Kayıtların”a hiçbir şekilde bilgi gelmemektedir. (Gerekirse Alper PALANDÖKEN’e farklı bir kart atayabiliriz)
+
+•	Sistemde optik oda giriş tarafında erişim yetkisi bulunmayan ve tesadüfen fark ettiğimiz bazı kullanıcı kartları optik odaya giriş yapabilmektedir. Ancak sonradan Optik Oda çıkış tarafına konumlandırılan cihazda yetki olmadığı için çıkış yapılamamaktadır. (Örnek: Emre CAN, 13.05.2026 saat 13:26 itibari ile yetkim olmamasına rağmen optik odaya giriş yapabildim ancak hiçbir şekilde çıkış yapamıyorum.)
+•	Bugün fark ettiğim farklı bir konu cihazdan cihaza kullanıcı kullanıcı ID farklılık göstermektedir.
+•	Mümkünse “Geçiş Kayıtları” sekmesine filtre eklenebilir mi? (Cihaz – Tarih ve/veya Tarih Aralığı – Ad/Soyad) (Mevcuttaki filtrede ad ve soyad yazınca filtreleme yapmıyor yalnızca ad ile filtreleme yapılabiliyor)
+•	İK’nın aldığı personel raporları için spot check yapabilir miyiz? (Geçiş Kayıtları ile İK’nın aldığı rapor arasındaki bazı farklılıklar tespit edilmiştir.)

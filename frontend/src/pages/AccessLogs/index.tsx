@@ -522,7 +522,7 @@ export const AccessLogsPage = () => {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Personel, kart no, sicil no..."
+                    placeholder="Ad, soyad, ad soyad, kart no, sicil no..."
                     value={filters.search}
                     onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
                     onKeyDown={handleSearchKeyDown}

@@ -96,9 +96,11 @@ export class AccessLogsService {
       qb.andWhere(`${this.derivedDirectionCase()} = :direction`, { direction });
     }
     if (search) {
+      // "Alper Palandoken" gibi ad+soyad birleşik aramayı da kapsar
       qb.andWhere(
         `(LOWER(personnel.firstName) LIKE LOWER(:search)
           OR LOWER(personnel.lastName) LIKE LOWER(:search)
+          OR LOWER(personnel.firstName || ' ' || personnel.lastName) LIKE LOWER(:search)
           OR LOWER(personnel.cardNumber) LIKE LOWER(:search)
           OR LOWER(personnel.employeeId) LIKE LOWER(:search))`,
         { search: `%${search}%` },

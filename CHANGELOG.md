@@ -191,6 +191,30 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 069
+Rev. Date  : 15.05.2026
+Rev. Time  : 09:54:00
+Rev. Prompt: Gecis Kayitlari filtre: ad+soyad birlesik arama
+
+Rev. Report: (
+  issues.txt #4: "Alper Palandöken" gibi ad+soyad birlikte yazinca search
+  bulamiyordu (her alana ayri ayri LIKE bakiyordu). Backend search'e
+  birlesik "firstName || ' ' || lastName" condition'i eklendi.
+
+  BACKEND — access-logs.service.ts applyFilters:
+  - WHERE OR'una eklendi:
+    LOWER(firstName || ' ' || lastName) LIKE LOWER('%term%')
+
+  FRONTEND — AccessLogs/index.tsx:
+  - Search input placeholder guncel: "Ad, soyad, ad soyad, kart no, sicil no..."
+
+  Diger filtreler zaten mevcuttu: Lokasyon, Cihaz, Yon, Baslangic+Bitis
+  tarih araligi.
+
+  Degisen dosyalar: 4 (access-logs.service.ts, AccessLogs/index.tsx,
+    CHANGELOG.md, version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 068
 Rev. Date  : 14.05.2026
 Rev. Time  : 17:53:00
