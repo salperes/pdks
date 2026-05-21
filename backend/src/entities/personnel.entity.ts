@@ -5,6 +5,8 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
+  BeforeInsert,
+  BeforeUpdate,
 } from 'typeorm';
 
 @Entity('personnel')
@@ -23,6 +25,18 @@ export class Personnel {
 
   @Column({ type: 'varchar', length: 50, unique: true, nullable: true, name: 'employee_id' })
   employeeId: string;
+
+  // Cihaz UID'leri integer; leading-zero stringler ('0000999') aynı kişi olmasına
+  // ragmen string equality'de '999' ile eşleşmiyor. Her insert/update'te numeric
+  // formdaki employeeId'lerden leading zero'lari soyariz (Portal-sync, manuel
+  // form, vs.) — non-numeric ID'lere (alfanumerik) dokunulmaz.
+  @BeforeInsert()
+  @BeforeUpdate()
+  normalizeEmployeeId(): void {
+    if (this.employeeId && /^0+[0-9]+$/.test(this.employeeId)) {
+      this.employeeId = String(parseInt(this.employeeId, 10));
+    }
+  }
 
   @Index()
   @Column({ type: 'varchar', length: 100, unique: true, nullable: true })

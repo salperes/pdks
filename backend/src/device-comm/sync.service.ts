@@ -312,10 +312,14 @@ export class SyncService {
       return null;
     }
 
-    // ZKTeco device user_id corresponds to Personnel ID (employeeId), not card number
-    const personnel = await this.personnelRepository.findOne({
-      where: { employeeId: String(deviceUserId) },
-    });
+    // Numeric karsilastirma: PDKS employeeId "0000999" gibi leading-zero
+    // formatlarinda olabilir, cihaz 999 (numeric) raporluyor. parseInt + CAST
+    // ile esitle (string equality kullanma — '999' != '0000999').
+    const personnel = await this.personnelRepository
+      .createQueryBuilder('p')
+      .where("p.employeeId ~ '^[0-9]+$'")
+      .andWhere('CAST(p.employeeId AS INTEGER) = :uid', { uid: deviceUserId })
+      .getOne();
 
     return personnel ?? null;
   }

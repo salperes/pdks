@@ -195,10 +195,13 @@ export class AdmsService {
 
     if (existing) return false;
 
-    // Find personnel by employeeId
-    const personnel = await this.personnelRepository.findOne({
-      where: { employeeId: String(deviceUserId) },
-    });
+    // Numeric karsilastirma: PDKS employeeId "0000999" gibi leading-zero
+    // formatinda olabilir; cihaz 999 raporluyor. CAST ile numerik esitlik.
+    const personnel = await this.personnelRepository
+      .createQueryBuilder('p')
+      .where("p.employeeId ~ '^[0-9]+$'")
+      .andWhere('CAST(p.employeeId AS INTEGER) = :uid', { uid: deviceUserId })
+      .getOne();
 
     const accessLog = new AccessLog();
     accessLog.deviceId = device.id;

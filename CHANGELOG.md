@@ -191,6 +191,67 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 073
+Rev. Date  : 21.05.2026
+Rev. Time  : 18:30:00
+Rev. Prompt: DB leading-zero employeeId normalize: tek seferlik temizlik + entity hook
+
+Rev. Report: (
+  Rev 072 sorgulama tarafini duzeltti ama veri kaynagi hala leading-zero
+  formundaydi (Ali Emir TURKMEN: "0000999"). Bu Rev hem mevcut veriyi
+  normalize ediyor hem de gelecekteki insert/update'leri otomatik temizliyor.
+
+  DB (production, tek seferlik):
+  - UPDATE personnel SET employee_id = LTRIM(employee_id, '0')
+    WHERE employee_id ~ '^0[0-9]+$';
+    → 1 kayit: "0000999" → "999"
+  - UPDATE access_logs SET personnel_id = p.id FROM personnel p
+    WHERE personnel_id IS NULL AND device_user_id IS NOT NULL
+    AND p.employee_id ~ '^[0-9]+$'
+    AND CAST(p.employee_id AS INTEGER) = device_user_id;
+    → 45 log backfill: gecmis "Tanimsiz" loglar dogru personele baglandi
+    (Ali Emir uid=999 için 42 log).
+
+  BACKEND — personnel.entity.ts:
+  - @BeforeInsert + @BeforeUpdate hook: normalizeEmployeeId()
+  - Sadece '^0+[0-9]+$' formundayken parseInt + String ile leading zero soyar
+  - Alfa-numerik ID'lere (orn: 'TEMP-001') dokunmaz
+  - Portal-sync .save(), manuel CRUD .save(), bulk import .save() hepsi
+    hook'u tetikler — bir daha leading-zero kayit girmez.
+
+  Degisen dosyalar: 2 (personnel.entity.ts, CHANGELOG.md, version.ts,
+    CLAUDE.md)
+)
+---------------------------------------------------------
+Rev. ID    : 072
+Rev. Date  : 15.05.2026
+Rev. Time  : 17:36:00
+Rev. Prompt: Leading-zero employeeId uid match bug: sync/adms findPersonnelByDeviceUser
+
+Rev. Report: (
+  KRITIK BUG: PDKS personnel employeeId "0000999" gibi leading-zero ile
+  kayitliyken cihaz uid=999 (numeric) raporluyordu. Backend string equality
+  ile karsilastirma yaptigi icin '999' != '0000999' → bulunamadi → "Tanimsiz"
+  log dustu. Ali Emir TURKMEN ornegi ile tespit: cihaz Audit'inde matched
+  goruluyor (parseInt mantigi) ama sync/adms log eslemesi string equality
+  kullaniyordu.
+
+  BACKEND — sync.service.ts findPersonnelByDeviceUser:
+  - WHERE employeeId = String(deviceUserId)
+  - YENI: WHERE employeeId ~ '^[0-9]+$' AND CAST(employeeId AS INTEGER) = uid
+  - "999", "0000999", "00999", "999 " hepsini eslestirir
+
+  BACKEND — adms.service.ts (ayni mantik):
+  - Ayni WHERE → CAST karsilastirmasiyla degistirildi
+
+  Geriye donuk: gecmis "Tanimsiz" loglar uid=N olarak DB'de duruyor,
+  personnel_id null. Tek seferlik backfill SQL ile dogru personele baglanir
+  (deploy sonrasi calistirilacak).
+
+  Degisen dosyalar: 4 (sync.service.ts, adms.service.ts, CHANGELOG.md,
+    version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 071
 Rev. Date  : 15.05.2026
 Rev. Time  : 17:28:00
