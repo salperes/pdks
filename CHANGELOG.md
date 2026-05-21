@@ -191,6 +191,41 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 071
+Rev. Date  : 15.05.2026
+Rev. Time  : 17:28:00
+Rev. Prompt: Esitle (reconcile) da getUsersExhaustive kullansin
+
+Rev. Report: (
+  Saha vaka: Fabrika 2'de uid=999 PDKS-disi bir kayit ama "Tanimsiz - Kart
+  #999" log uretmeye devam ediyor. Personel cihazda kayitli, kart okuttugunda
+  cihaz uid=999 dondurur, PDKS'te 999 yok → Tanimsiz.
+
+  Cozum: Reconcile (Esitle butonu) duplicate-cardno mantigini (Rev 060/061)
+  tetiklemeli — ayni cardno baska uid'de varsa eski uid silinir, PDKS push'u
+  ile dogru uid yeni cardno ile yazilir.
+
+  Ama reconcile.service.ts reconcileDevice() metodunda getUsers cagrisi
+  tek deneme kullaniyor → UDP packet loss durumunda uid=999 listede gelmiyor
+  → duplicate-cardno tespit edilemiyor.
+
+  BACKEND — reconcile.service.ts reconcileDevice:
+  - getUsers → getUsersExhaustive(zk, 3) (auditDevice ile ayni)
+  - Tum cihaz user listesi tam gelir, duplicate detection PDKS-disi uid'leri
+    yakalayip siler
+
+  Beklenen akis:
+  1. Personel kart okutur, cihaz uid=999 raporlar, Tanimsiz log
+  2. Operator: Cihazlar > Fabrika 2 > Esitle
+  3. reconcile getUsersExhaustive ile uid=999'u tespit eder
+  4. PDKS expected user (ornegin uid=1234, cardno=X) push edilirken cihazda
+     ayni cardno=X baska uid (999)'da varsa once silinir
+  5. Yeni push (uid=1234) tek dogru kayit olur
+  6. Personel bir daha kart okuttugunda log dogru personele bagli gelir
+
+  Degisen dosyalar: 3 (reconcile.service.ts, CHANGELOG.md, version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 070
 Rev. Date  : 21.05.2026
 Rev. Time  : 16:53:00

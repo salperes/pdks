@@ -134,10 +134,12 @@ export class ReconcileService {
     }
 
     try {
-      // 1. Cihazdaki kullanıcı listesini al
+      // 1. Cihazdaki kullanıcı listesini al — UDP packet loss'a karsi 3 deneme
+      // (duplicate-cardno mantigi tum user'lari gormek zorunda; aksi halde
+      // eski PDKS-disi uid'ler tespit edilemez ve kart cakismasi devam eder)
       let deviceUsers: Array<{ uid: number; cardno: number; name?: string }> = [];
       try {
-        const got: any = await this.zktecoClient.getUsers(zk);
+        const got: any = await this.zktecoClient.getUsersExhaustive(zk, 3);
         const arr = Array.isArray(got) ? got : got?.data ?? [];
         deviceUsers = arr.filter((u: any) => u && typeof u.uid === 'number');
       } catch (err: any) {
