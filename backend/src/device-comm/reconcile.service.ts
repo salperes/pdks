@@ -468,7 +468,8 @@ export class ReconcileService {
     try {
       let deviceUsers: Array<{ uid: number; cardno: number; name?: string }> = [];
       try {
-        const got: any = await this.zktecoClient.getUsers(zk);
+        // Audit icin tam liste sart: UDP packet loss'a karsi 3 deneme + format reset
+        const got: any = await this.zktecoClient.getUsersExhaustive(zk, 3);
         const arr = Array.isArray(got) ? got : got?.data ?? [];
         deviceUsers = arr.filter((u: any) => u && typeof u.uid === 'number');
       } catch (err: any) {

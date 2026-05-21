@@ -525,6 +525,38 @@ export class ZktecoClientService {
             throw error;
         }
     }
+    /**
+     * getUsers'i N kez dene + paket format cache'ini her denemede sifirla.
+     * UDP packet loss/partial response durumunda eksik kalan uid'leri yakalar.
+     * Audit gibi tam liste gereken yerlerde kullanilir.
+     * @param attempts varsayilan 3
+     */
+    async getUsersExhaustive(zk, attempts = 3): Promise<{ data: any[] }> {
+        const merged = new Map<number, any>();
+        const udp = this.getUdpClient(zk);
+        const ip = udp?.ip ?? '';
+        let firstError: any = null;
+        for (let i = 0; i < attempts; i++) {
+            try {
+                // Her denemede paket format cache'ini sifirla; auto-detect baştan calişsin
+                if (ip) this.udpUserPacketFormat.delete(ip);
+                const result: any = await this.getUsers(zk);
+                const arr: any[] = Array.isArray(result) ? result : (result?.data ?? []);
+                for (const u of arr) {
+                    if (u && typeof u.uid === 'number' && !merged.has(u.uid)) {
+                        merged.set(u.uid, u);
+                    }
+                }
+                this.logger.log(`[getUsersExhaustive] attempt ${i + 1}/${attempts}: ${arr.length} users (total unique so far: ${merged.size})`);
+            }
+            catch (error: any) {
+                if (!firstError) firstError = error;
+                this.logger.warn(`[getUsersExhaustive] attempt ${i + 1} failed: ${error?.message ?? error}`);
+            }
+        }
+        if (merged.size === 0 && firstError) throw firstError;
+        return { data: Array.from(merged.values()) };
+    }
     async clearAttendanceLog(zk) {
         try {
             await zk.clearAttendanceLog();

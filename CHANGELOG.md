@@ -191,6 +191,38 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 070
+Rev. Date  : 21.05.2026
+Rev. Time  : 16:53:00
+Rev. Prompt: Audit endpoint UDP packet loss'a karsi cok denemeli getUsers
+
+Rev. Report: (
+  Tanı: Fabrika 2'de uid=999 (ve digerleri: 2576/2729/796/...) cihazda
+  log uretmeye devam ediyordu AMA audit getUsers listesinde gorunmuyordu.
+  Sebep: UDP getUsers buyuk listede paket dusurebiliyor → eksik liste donuyor.
+  Audit "X: 0 unknown" derken cihazda yabanci kayitlar gercekten var.
+
+  BACKEND — zkteco-client.service.ts:
+  - Yeni metod: getUsersExhaustive(zk, attempts=3)
+    * Her denemede udpUserPacketFormat cache'i temizlenir (auto-detect baştan)
+    * Sonuclar uid bazli merge edilir (Map)
+    * Log: her attempt sonrasinda toplam unique user sayisi
+    * Tum denemeler basarisiz olursa ilk hatayi firlatir
+
+  BACKEND — reconcile.service.ts auditDevice:
+  - getUsers yerine getUsersExhaustive(zk, 3) kullanir
+  - UDP partial olsa bile 3 deneme = buyuk olasilikla tam liste
+
+  Beklenen etki: Fabrika 2 audit'te artik uid=999 ve diger Tanimsiz uid'ler
+  Yabanci sekmesinde gorunecek → secici silme mumkun.
+
+  Risk: Audit suresi 3x artar (~30sn per device). Operatorel — sahada tek
+  seferlik kullanim icin makul.
+
+  Degisen dosyalar: 4 (zkteco-client.service.ts, reconcile.service.ts,
+    CHANGELOG.md, version.ts)
+)
+---------------------------------------------------------
 Rev. ID    : 069
 Rev. Date  : 15.05.2026
 Rev. Time  : 09:54:00
