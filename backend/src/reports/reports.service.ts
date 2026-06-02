@@ -95,11 +95,16 @@ interface DayResult {
 }
 
 /**
- * Yön modeli (öncelikli):
- *   1) Yön damgalı (direction='in'/'out') cihaz kayıtları varsa: ilk 'in' = giriş,
- *      son 'out' = çıkış.
- *   2) Yoksa türev kuralı: ilk kayıt = giriş, son kayıt = çıkış.
- * Logların event_time'a göre sıralı geldiği varsayılır.
+ * Gün boyunca farklı lokasyonlardaki tüm logları birlikte değerlendirir:
+ *   - firstIn  = günün ilk hareketi (her zaman logs[0])
+ *   - lastOut  = günün son hareketi; istisna: son log direction='in' damgalıysa
+ *                kişi binaya girip kalmış → çıkış yok (null).
+ *
+ * Bu sayede karışık ortam (örn. sabah Teknokent in/out kapıları + öğleden sonra
+ * Fabrika 1 'both' kapısı) doğru hesaplanır. Yön damgası, "kişi içeride kaldı
+ * mı" sorusunu yanıtlamak için kullanılır; firstIn/lastOut zaman bazlıdır.
+ *
+ * Logların event_time'a göre ASC sıralı geldiği varsayılır.
  */
 function processDayLogs(logs: AccessLog[], cfg: WorkConfig): DayResult {
   if (logs.length === 0) {
@@ -113,17 +118,12 @@ function processDayLogs(logs: AccessLog[], cfg: WorkConfig): DayResult {
     };
   }
 
-  const inLogs = logs.filter((l) => l.direction === 'in');
-  const outLogs = logs.filter((l) => l.direction === 'out');
-
-  const firstIn =
-    inLogs.length > 0 ? new Date(inLogs[0].eventTime) : new Date(logs[0].eventTime);
+  const firstIn = new Date(logs[0].eventTime);
+  const lastLog = logs[logs.length - 1];
   const lastOut =
-    outLogs.length > 0
-      ? new Date(outLogs[outLogs.length - 1].eventTime)
-      : logs.length > 1
-        ? new Date(logs[logs.length - 1].eventTime)
-        : null;
+    logs.length > 1 && lastLog.direction !== 'in'
+      ? new Date(lastLog.eventTime)
+      : null;
 
   let totalMinutes = 0;
   if (firstIn && lastOut && lastOut > firstIn) {

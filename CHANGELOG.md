@@ -191,6 +191,37 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 074
+Rev. Date  : 02.06.2026
+Rev. Time  : 09:15:00
+Rev. Prompt: Gunluk rapor: farkli lokasyonlardaki giris/cikislar dikkate alinmiyor
+
+Rev. Report: (
+  BUG: Karisik gunlerde (sabah Teknokent direction-aware kapilar + ogleden
+  sonra Fabrika 1 'both' kapisi) gunluk rapor sadece ilk lokasyonun
+  cikisini gosteriyordu. Selcuk Alper ES ornegi: 08:00 Teknokent in,
+  12:00 Teknokent out, 13:00 Fabrika 1, 17:00 Fabrika 1 → rapor
+  firstIn=08:00 / lastOut=12:00 (Fabrika 1'in 17:00 cikisini atliyordu).
+
+  KOK NEDEN: processDayLogs (reports.service.ts) lastOut'u sadece
+  direction='out' damgali loglardan ariyordu. Fabrika 'both' cihazlari
+  log direction=null yaziyor, outLogs listesine girmiyor.
+
+  FIX — processDayLogs:
+  - firstIn = logs[0].eventTime (gunun ilk hareketi)
+  - lastOut = logs[N-1].eventTime, sart: son log direction !== 'in'
+    (son log 'in' damgaliysa kisi binaya girip kalmis demek → null)
+  - Direction filtresi kaldirildi. Hybrid model 4 senaryoyu da dogru
+    cozer: tek lokasyon direction-aware, tek lokasyon 'both', cok
+    lokasyon hepsi direction-aware, cok lokasyon karisik.
+
+  Etkilenen rapor: gunluk, aylik ozet, departman ozeti (hepsi
+  processDayLogs cagiriyor).
+
+  Degisen dosyalar: 3 (reports.service.ts, CHANGELOG.md, version.ts,
+    CLAUDE.md)
+)
+---------------------------------------------------------
 Rev. ID    : 073
 Rev. Date  : 21.05.2026
 Rev. Time  : 18:30:00
