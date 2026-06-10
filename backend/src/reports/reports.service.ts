@@ -224,6 +224,21 @@ function detectLunchGap(
       bestReturn = inWindow[i + 1].time;
     }
   }
+
+  // Tutarlilik kontrolu: moladan donus sonrasi en az bir punch olmali. Yoksa
+  // o "donus" punch'i aslinda gunun son cikisidir (kisi yarim gun, izin, vs.),
+  // gercek bir mola degildir. lunchOut/Return null doner; nominal dusum
+  // processDayLogs'da yine uygulanir.
+  if (bestReturn) {
+    const returnMs = bestReturn.getTime();
+    const hasPunchAfter = logs.some(
+      (l) => new Date(l.eventTime).getTime() > returnMs,
+    );
+    if (!hasPunchAfter) {
+      return { lunchOut: null, lunchReturn: null, actualMinutes: 0 };
+    }
+  }
+
   return { lunchOut: bestOut, lunchReturn: bestReturn, actualMinutes: bestGap };
 }
 

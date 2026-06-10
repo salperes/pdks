@@ -191,6 +191,39 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 079
+Rev. Date  : 03.06.2026
+Rev. Time  : 17:20:00
+Rev. Prompt: Mola donus = lastOut tutarsizligi: yarim gun/erken cikis mola sayilmasin
+
+Rev. Report: (
+  BUG: detectLunchGap, kisi yarim gun ya da ogleden sonra erken cikis
+  yaptiginda ogleden onceki son punch + erken cikis punch'ini "mola" olarak
+  isaretliyordu.
+
+  Ornek (Afranur CETINTAS):
+    Punchler: 08:06, 12:39, 13:08
+    Eski algoritma: 12:39 ve 13:08 ikisi de [11:45, 14:15] penceresinde →
+    aralarinda 29 dk gap → mola kabul ediliyordu.
+    Ama 13:08 ayni zamanda lastOut (gunun son punch'i) → mola donus =
+    gunun bitisi → tutarsiz: "moladan donup ayni dakika gitti"
+
+  FIX: detectLunchGap'e tutarlilik kontrolu eklendi.
+  - Tespit edilen lunchReturn'den SONRA en az bir punch olmasi gerekir
+  - Yoksa o "donus" gerceginde gunun son cikisidir, mola degildir
+  - lunchOut/Return null doner, nominal dusum yine uygulanir
+
+  Afranur icin yeni sonuc:
+    lunchOut = null, lunchReturn = null
+    Mola Suresi = nominal_overlap([08:06, 13:08] ∩ [12:30, 13:30]) = 38 dk
+    Calisma = (13:08 - 08:06) - 38 dk = 264 dk = 4.4 sa
+
+  Berat icin durum degismiyor cunku 13:33'ten sonra 17:20 punch'i var
+  (gercek mola dogru tespit ediliyor).
+
+  Degisen dosyalar: 3 (reports.service.ts, CHANGELOG, version.ts, CLAUDE.md)
+)
+---------------------------------------------------------
 Rev. ID    : 078
 Rev. Date  : 03.06.2026
 Rev. Time  : 16:40:00
