@@ -191,6 +191,31 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 077
+Rev. Date  : 03.06.2026
+Rev. Time  : 15:10:00
+Rev. Prompt: Raporlar tablolari: sticky header + grid lines
+
+Rev. Report: (
+  UI iyilestirme — 3 sekmenin de tablolari:
+  - Header sabit (sticky top-0) — liste asagi scroll edilirken kolon
+    basliklari yerinde durur
+  - Tum hucrelerde grid line (border) — kolon ve satirlar arasinda
+    cizgili gorunum
+  - Container: max-h-[calc(100vh-340px)] min-h-[300px] overflow-auto
+
+  Degisiklikler reports/index.tsx:
+  - thClass: border + sticky bg ekleri
+  - tdClass: border ekleri
+  - scrollWrap + stickyHead helper'lari
+  - 3 tablodaki overflow-x-auto wrapper'lar scrollWrap'e cevrildi
+  - 3 thead tr'larinda stickyHead className uygulandi
+
+  Sadece frontend — backend etkilenmedi.
+
+  Degisen dosyalar: 3 (Reports/index.tsx, CHANGELOG, version.ts, CLAUDE.md)
+)
+---------------------------------------------------------
 Rev. ID    : 076
 Rev. Date  : 03.06.2026
 Rev. Time  : 14:30:00

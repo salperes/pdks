@@ -409,8 +409,14 @@ export const ReportsPage = () => {
   /* ────── shared styles ────── */
 
   const thClass =
-    'text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider';
-  const tdClass = 'px-4 py-3 text-sm text-gray-700 dark:text-gray-300';
+    'text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900';
+  const tdClass =
+    'px-4 py-3 text-sm text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700';
+  // Sticky header + dikey scroll icin tablo container
+  const scrollWrap =
+    'overflow-auto max-h-[calc(100vh-340px)] min-h-[300px]';
+  const stickyHead =
+    'sticky top-0 z-10 bg-gray-50 dark:bg-gray-900';
   const btnPrimary =
     'inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-[#0078d4] text-white hover:bg-[#106eba] transition-colors disabled:opacity-50';
   const btnOutline =
@@ -585,10 +591,10 @@ export const ReportsPage = () => {
                     {fmtDateLabel(dailyData.date)} — Günlük Devam Raporu
                   </h3>
                 </div>
-                <div className="overflow-x-auto">
+                <div className={scrollWrap}>
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                      <tr className={stickyHead + " border-b border-gray-200 dark:border-gray-700"}>
                         <th className={thClass}>Personel</th>
                         <th className={thClass}>Departman</th>
                         <th className={thClass}>Giriş</th>
@@ -752,10 +758,10 @@ export const ReportsPage = () => {
                     {monthNames[monthlyData.month]} {monthlyData.year} — Aylık Devam Özeti
                   </h3>
                 </div>
-                <div className="overflow-x-auto">
+                <div className={scrollWrap}>
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                      <tr className={stickyHead + " border-b border-gray-200 dark:border-gray-700"}>
                         <th className={thClass}>Personel</th>
                         <th className={thClass}>Departman</th>
                         <th className={`${thClass} text-center`}>Gelen Gün</th>
@@ -916,10 +922,10 @@ export const ReportsPage = () => {
                     {fmtDateLabel(deptData.startDate)} — {fmtDateLabel(deptData.endDate)} | Departman Analizi
                   </h3>
                 </div>
-                <div className="overflow-x-auto">
+                <div className={scrollWrap}>
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                      <tr className={stickyHead + " border-b border-gray-200 dark:border-gray-700"}>
                         <th className={thClass}>Departman</th>
                         <th className={`${thClass} text-center`}>Personel</th>
                         <th className={`${thClass} text-center`}>Gelen Kişi</th>
