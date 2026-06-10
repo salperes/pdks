@@ -27,6 +27,20 @@ export class CreateWorkScheduleDto {
   @IsOptional()
   @IsIn(['firstLast', 'paired'])
   calculationMode?: 'firstLast' | 'paired';
+
+  @IsBoolean()
+  @IsOptional()
+  lunchEnabled?: boolean;
+
+  @IsString()
+  @IsOptional()
+  @Matches(/^\d{2}:\d{2}$/, { message: 'lunchStartTime must be HH:MM format' })
+  lunchStartTime?: string | null;
+
+  @IsString()
+  @IsOptional()
+  @Matches(/^\d{2}:\d{2}$/, { message: 'lunchEndTime must be HH:MM format' })
+  lunchEndTime?: string | null;
 }
 
 export class UpdateWorkScheduleDto extends PartialType(CreateWorkScheduleDto) {}

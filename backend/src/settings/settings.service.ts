@@ -99,12 +99,29 @@ export class SettingsService {
     isFlexible = false,
     flexGraceMinutes: number | null = null,
     calculationMode: 'firstLast' | 'paired' = 'firstLast',
+    lunchEnabled = false,
+    lunchStartTime: string | null = null,
+    lunchEndTime: string | null = null,
   ) {
     const [sh, sm] = startTime.split(':').map(Number);
     const [eh, em] = endTime.split(':').map(Number);
     const sign = timezoneOffset >= 0 ? '+' : '-';
     const pad2 = (n: number) => String(n).padStart(2, '0');
     const tzStr = `${sign}${pad2(Math.abs(timezoneOffset))}:00`;
+
+    // Lunch window dakika-of-day cinsinden. Etkin degilse veya HH:MM gecersizse null.
+    const parseHHMM = (s: string | null): number | null => {
+      if (!s || !/^\d{2}:\d{2}$/.test(s)) return null;
+      const [h, m] = s.split(':').map(Number);
+      return h * 60 + m;
+    };
+    const lunchStartMinutes = lunchEnabled ? parseHHMM(lunchStartTime) : null;
+    const lunchEndMinutes = lunchEnabled ? parseHHMM(lunchEndTime) : null;
+    const lunchActive =
+      lunchEnabled &&
+      lunchStartMinutes != null &&
+      lunchEndMinutes != null &&
+      lunchEndMinutes > lunchStartMinutes;
 
     return {
       startHour: sh,
@@ -119,6 +136,9 @@ export class SettingsService {
       flexGraceMinutes: flexGraceMinutes ?? null,
       shiftDurationMinutes: (eh * 60 + em) - (sh * 60 + sm),
       calculationMode,
+      lunchEnabled: lunchActive,
+      lunchStartMinutes: lunchActive ? lunchStartMinutes : null,
+      lunchEndMinutes: lunchActive ? lunchEndMinutes : null,
     };
   }
 
@@ -144,6 +164,9 @@ export class SettingsService {
           ws.isFlexible,
           ws.flexGraceMinutes,
           ws.calculationMode ?? 'firstLast',
+          ws.lunchEnabled ?? false,
+          ws.lunchStartTime ?? null,
+          ws.lunchEndTime ?? null,
         );
       }
     }
@@ -175,6 +198,9 @@ export class SettingsService {
           ws.isFlexible,
           ws.flexGraceMinutes,
           ws.calculationMode ?? 'firstLast',
+          ws.lunchEnabled ?? false,
+          ws.lunchStartTime ?? null,
+          ws.lunchEndTime ?? null,
         ));
       }
     }

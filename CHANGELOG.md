@@ -191,6 +191,51 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 075
+Rev. Date  : 03.06.2026
+Rev. Time  : 10:45:00
+Rev. Prompt: Mesai programlarina lokasyon bazli ogle molasi - calismadan otomatik dusulur
+
+Rev. Report: (
+  Yeni ozellik: her mesai programi (work_schedule) icin opsiyonel ogle
+  molasi penceresi tanimlanir. Lokasyona atanan mesai programi rapor
+  hesaplamasinda calisma araligi ile mola penceresi kesisimini gunluk
+  calisma suresinden otomatik duser. Kisi punch out yapsa da yapmasa da
+  uygulanir (nominal politika).
+
+  BACKEND — work-schedule.entity.ts:
+  - lunch_enabled (bool, default false)
+  - lunch_start_time (varchar 5, HH:MM, nullable)
+  - lunch_end_time (varchar 5, HH:MM, nullable)
+
+  BACKEND — create-work-schedule.dto.ts: 3 optional alan (validation HH:MM)
+
+  BACKEND — settings.service.ts buildWorkConfig:
+  - 3 yeni parametre (lunchEnabled, lunchStartTime, lunchEndTime)
+  - WorkConfig'e lunchStartMinutes / lunchEndMinutes (dakika-of-day) ekler
+  - lunch_end > lunch_start gereksinimi yoksa sessizce devre disi birakilir
+  - getWorkConfigForLocation ve getAllLocationConfigs propagate eder
+
+  BACKEND — reports.service.ts processDayLogs:
+  - lunchOverlapMinutes helper: [firstIn, lastOut] ile lunch penceresi
+    kesisimi (dakika). Kisi 12:00'da gunu bitirip cikmissa kesisim 0
+    olur → dusum yok. Tam mola kapsanmissa tam 60 dk dusulur.
+  - totalMinutes hesabindan dusulur, asagi 0'da klemplenir
+  - Gunluk, aylik ozet, departman ozeti uc rapor da etkilenir
+
+  FRONTEND — types/WorkSchedule: 3 yeni alan
+  FRONTEND — pages/WorkSchedules:
+  - ScheduleForm + emptyForm 3 yeni alan (default: 12:30-13:30, kapali)
+  - Tabloda yeni "Ogle Molasi" sutunu (Coffee ikonu + saatler)
+  - Formda "Esnek Mesai" altinda yeni "Ogle Molasi" toggle bolumu;
+    acildiginda baslangic / bitis saat input'lari gosterilir
+  - Payload lunchEnabled false ise saatler null gonderilir
+
+  Degisen dosyalar: 7 (work-schedule.entity.ts, dto, settings.service.ts,
+    reports.service.ts, types/index.ts, WorkSchedules/index.tsx,
+    CHANGELOG, version.ts, CLAUDE.md)
+)
+---------------------------------------------------------
 Rev. ID    : 074
 Rev. Date  : 02.06.2026
 Rev. Time  : 09:15:00

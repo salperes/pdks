@@ -58,6 +58,9 @@ export interface WorkSchedule {
   isFlexible: boolean;
   flexGraceMinutes: number | null;
   calculationMode: 'firstLast' | 'paired';
+  lunchEnabled: boolean;
+  lunchStartTime: string | null;
+  lunchEndTime: string | null;
   locationCount?: number;
 }
 

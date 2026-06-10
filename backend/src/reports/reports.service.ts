@@ -19,6 +19,9 @@ interface WorkConfig {
   flexGraceMinutes: number | null;
   shiftDurationMinutes: number;
   calculationMode: 'firstLast' | 'paired';
+  lunchEnabled: boolean;
+  lunchStartMinutes: number | null; // dakika-of-day (lokal); ornegin 12:30 = 750
+  lunchEndMinutes: number | null;
 }
 
 /* ---------- helpers ---------- */
@@ -128,6 +131,7 @@ function processDayLogs(logs: AccessLog[], cfg: WorkConfig): DayResult {
   let totalMinutes = 0;
   if (firstIn && lastOut && lastOut > firstIn) {
     totalMinutes = (lastOut.getTime() - firstIn.getTime()) / 60000;
+    totalMinutes = Math.max(0, totalMinutes - lunchOverlapMinutes(firstIn, lastOut, cfg));
   }
 
   return {
@@ -138,6 +142,25 @@ function processDayLogs(logs: AccessLog[], cfg: WorkConfig): DayResult {
     isEarly: lastOut ? isEarly(lastOut, cfg, firstIn) : false,
     punchCount: logs.length,
   };
+}
+
+/**
+ * Calisma araligi [firstIn, lastOut] ile lunch penceresinin kesisimi (dakika).
+ * Kisi punch out yapsa da yapmasa da lunch saatleri calismadan dusulur (nominal
+ * politika). Kisi 12:00'da gunu bitirip cikmissa kesisim 0 → dusum yok.
+ */
+function lunchOverlapMinutes(firstIn: Date, lastOut: Date, cfg: WorkConfig): number {
+  if (!cfg.lunchEnabled || cfg.lunchStartMinutes == null || cfg.lunchEndMinutes == null) {
+    return 0;
+  }
+  const startLocal = toLocal(firstIn, cfg);
+  const endLocal = toLocal(lastOut, cfg);
+  // Ayni gun varsayilir; gece yarisini gecen vardiyalar bu modelde hesaplanmaz.
+  const startMinute = startLocal.getUTCHours() * 60 + startLocal.getUTCMinutes();
+  const endMinute = endLocal.getUTCHours() * 60 + endLocal.getUTCMinutes();
+  const overlapStart = Math.max(startMinute, cfg.lunchStartMinutes);
+  const overlapEnd = Math.min(endMinute, cfg.lunchEndMinutes);
+  return Math.max(0, overlapEnd - overlapStart);
 }
 
 /** Günlük logların ilk kaydının lokasyonuna göre work config seç. */

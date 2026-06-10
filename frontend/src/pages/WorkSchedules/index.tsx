@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Clock, Plus, Edit, Trash2, X, ToggleLeft, ToggleRight, MapPin } from 'lucide-react';
+import { Clock, Plus, Edit, Trash2, X, ToggleLeft, ToggleRight, MapPin, Coffee } from 'lucide-react';
 import { api } from '../../services/api';
 import type { WorkSchedule } from '../../types';
 
@@ -10,6 +10,9 @@ interface ScheduleForm {
   isFlexible: boolean;
   flexGraceMinutes: number;
   calculationMode: 'firstLast' | 'paired';
+  lunchEnabled: boolean;
+  lunchStartTime: string;
+  lunchEndTime: string;
 }
 
 interface Toast {
@@ -25,6 +28,9 @@ const emptyForm: ScheduleForm = {
   isFlexible: false,
   flexGraceMinutes: 60,
   calculationMode: 'firstLast',
+  lunchEnabled: false,
+  lunchStartTime: '12:30',
+  lunchEndTime: '13:30',
 };
 
 export const WorkSchedulesPage = () => {
@@ -71,6 +77,9 @@ export const WorkSchedulesPage = () => {
       isFlexible: s.isFlexible,
       flexGraceMinutes: s.flexGraceMinutes || 60,
       calculationMode: s.calculationMode || 'firstLast',
+      lunchEnabled: s.lunchEnabled ?? false,
+      lunchStartTime: s.lunchStartTime || '12:30',
+      lunchEndTime: s.lunchEndTime || '13:30',
     });
     setModalOpen(true);
   };
@@ -87,6 +96,9 @@ export const WorkSchedulesPage = () => {
         isFlexible: form.isFlexible,
         flexGraceMinutes: form.isFlexible ? form.flexGraceMinutes : null,
         calculationMode: form.calculationMode,
+        lunchEnabled: form.lunchEnabled,
+        lunchStartTime: form.lunchEnabled ? form.lunchStartTime : null,
+        lunchEndTime: form.lunchEnabled ? form.lunchEndTime : null,
       };
       if (editingId) {
         await api.patch(`/work-schedules/${editingId}`, payload);
@@ -178,6 +190,7 @@ export const WorkSchedulesPage = () => {
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Hesaplama</th>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Esnek Mesai</th>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Tolerans</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Öğle Molası</th>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Lokasyonlar</th>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase text-right">İşlemler</th>
               </tr>
@@ -215,6 +228,16 @@ export const WorkSchedulesPage = () => {
                   </td>
                   <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
                     {s.isFlexible && s.flexGraceMinutes ? `${s.flexGraceMinutes} dk` : '—'}
+                  </td>
+                  <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
+                    {s.lunchEnabled && s.lunchStartTime && s.lunchEndTime ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Coffee className="h-3.5 w-3.5 text-amber-600" />
+                        {s.lunchStartTime}–{s.lunchEndTime}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 text-sm">—</span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-400">
@@ -392,6 +415,58 @@ export const WorkSchedulesPage = () => {
                       max={240}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
+                  </div>
+                )}
+              </div>
+
+              {/* Lunch break */}
+              <div className="space-y-3">
+                <div
+                  className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-lg cursor-pointer"
+                  onClick={() => setForm({ ...form, lunchEnabled: !form.lunchEnabled })}
+                >
+                  <div className="flex items-start gap-2">
+                    <Coffee className="h-4 w-4 text-amber-600 mt-0.5" />
+                    <div>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Öğle Molası
+                      </span>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        Bu saatler günlük çalışma süresinden otomatik düşülür
+                      </p>
+                    </div>
+                  </div>
+                  {form.lunchEnabled ? (
+                    <ToggleRight className="h-6 w-6 text-amber-600" />
+                  ) : (
+                    <ToggleLeft className="h-6 w-6 text-gray-400" />
+                  )}
+                </div>
+
+                {form.lunchEnabled && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Mola Başlangıcı
+                      </label>
+                      <input
+                        type="time"
+                        value={form.lunchStartTime}
+                        onChange={(e) => setForm({ ...form, lunchStartTime: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Mola Bitişi
+                      </label>
+                      <input
+                        type="time"
+                        value={form.lunchEndTime}
+                        onChange={(e) => setForm({ ...form, lunchEndTime: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
                   </div>
                 )}
               </div>

@@ -29,6 +29,15 @@ export class WorkSchedule {
   @Column({ type: 'varchar', length: 10, default: 'firstLast', name: 'calculation_mode' })
   calculationMode: 'firstLast' | 'paired';
 
+  @Column({ type: 'boolean', default: false, name: 'lunch_enabled' })
+  lunchEnabled: boolean;
+
+  @Column({ type: 'varchar', length: 5, nullable: true, name: 'lunch_start_time' })
+  lunchStartTime: string | null;
+
+  @Column({ type: 'varchar', length: 5, nullable: true, name: 'lunch_end_time' })
+  lunchEndTime: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
