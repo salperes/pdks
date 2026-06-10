@@ -30,6 +30,9 @@ interface DailyRecord {
   isLate: boolean;
   isEarlyLeave: boolean;
   punchCount: number;
+  lunchOut: string | null;
+  lunchReturn: string | null;
+  lunchMinutes: number;
 }
 
 interface DailyReport {
@@ -56,6 +59,7 @@ interface MonthlyRecord {
   lateCount: number;
   earlyLeaveCount: number;
   totalHours: number;
+  totalLunchHours: number;
   attendanceRate: number;
 }
 
@@ -177,9 +181,21 @@ const Empty = ({ text }: { text: string }) => (
 
 /* ────────────────── main component ────────────────── */
 
+const ALL_DEPARTMENTS = '__all__';
+
+const fmtMinutes = (m: number) => {
+  if (!m || m <= 0) return '-';
+  const h = Math.floor(m / 60);
+  const mm = Math.round(m % 60);
+  if (h === 0) return `${mm} dk`;
+  if (mm === 0) return `${h} sa`;
+  return `${h} sa ${mm} dk`;
+};
+
 export const ReportsPage = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('daily');
   const [search, setSearch] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState<string>(ALL_DEPARTMENTS);
 
   // ─── Daily state ───
   const [dailyDate, setDailyDate] = useState(todays());
@@ -252,17 +268,24 @@ export const ReportsPage = () => {
       'Departman',
       'Giriş',
       'Çıkış',
+      'Mola Çıkış',
+      'Mola Dönüş',
+      'Mola Süresi (dk)',
       'Süre (saat)',
       'Durum',
       'Geç Kaldı',
       'Erken Çıktı',
     ];
-    const rows = dailyData.records.map((r) => [
+    // Ekrandaki filtreleri (departman + arama) CSV'ye de uygula — fark olmasin
+    const rows = filterByName(dailyData.records).map((r) => [
       r.firstName,
       r.lastName,
       r.department || '-',
       formatTimeNullable(r.firstIn),
       formatTimeNullable(r.lastOut),
+      formatTimeNullable(r.lunchOut),
+      formatTimeNullable(r.lunchReturn),
+      String(r.lunchMinutes || 0),
       String(r.totalHours),
       r.isPresent ? 'Geldi' : 'Gelmedi',
       r.isLate ? 'Evet' : 'Hayır',
@@ -282,9 +305,10 @@ export const ReportsPage = () => {
       'Geç Kalma',
       'Erken Çıkma',
       'Toplam Saat',
+      'Toplam Mola (saat)',
       'Devam Oranı (%)',
     ];
-    const rows = monthlyData.records.map((r) => [
+    const rows = filterByName(monthlyData.records).map((r) => [
       r.firstName,
       r.lastName,
       r.department || '-',
@@ -293,6 +317,7 @@ export const ReportsPage = () => {
       String(r.lateCount),
       String(r.earlyLeaveCount),
       String(r.totalHours),
+      String(r.totalLunchHours ?? 0),
       String(r.attendanceRate),
     ]);
     downloadCSV(
@@ -313,7 +338,7 @@ export const ReportsPage = () => {
       'Erken Çıkma',
       'Ort. Saat/Gün',
     ];
-    const rows = deptData.records.map((r) => [
+    const rows = filterDeptByName(deptData.records).map((r) => [
       r.department,
       String(r.totalPersonnel),
       String(r.presentPersonnel),
@@ -331,12 +356,18 @@ export const ReportsPage = () => {
 
   /* ────── filtered records ────── */
 
-  const filterByName = <T extends { firstName: string; lastName: string }>(
+  const filterByName = <
+    T extends { firstName: string; lastName: string; department: string },
+  >(
     list: T[],
   ) => {
-    if (!search.trim()) return list;
+    let out = list;
+    if (departmentFilter !== ALL_DEPARTMENTS) {
+      out = out.filter((r) => (r.department || '-') === departmentFilter);
+    }
+    if (!search.trim()) return out;
     const q = search.toLowerCase();
-    return list.filter(
+    return out.filter(
       (r) =>
         r.firstName.toLowerCase().includes(q) ||
         r.lastName.toLowerCase().includes(q),
@@ -344,9 +375,27 @@ export const ReportsPage = () => {
   };
 
   const filterDeptByName = (list: DepartmentRecord[]) => {
-    if (!search.trim()) return list;
+    let out = list;
+    if (departmentFilter !== ALL_DEPARTMENTS) {
+      out = out.filter((r) => (r.department || '-') === departmentFilter);
+    }
+    if (!search.trim()) return out;
     const q = search.toLowerCase();
-    return list.filter((r) => r.department.toLowerCase().includes(q));
+    return out.filter((r) => r.department.toLowerCase().includes(q));
+  };
+
+  /** Aktif sekmenin record'larindan benzersiz departmanlari sirali doner. */
+  const departmentOptions = (): string[] => {
+    let src: { department: string }[] = [];
+    if (activeTab === 'daily' && dailyData) src = dailyData.records;
+    else if (activeTab === 'monthly' && monthlyData) src = monthlyData.records;
+    else if (activeTab === 'department' && deptData) src = deptData.records;
+    const set = new Set<string>();
+    for (const r of src) {
+      const d = r.department || '-';
+      if (d) set.add(d);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'tr'));
   };
 
   /* ────── tab definitions ────── */
@@ -392,16 +441,31 @@ export const ReportsPage = () => {
             </div>
           </div>
 
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Ara..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className={`${inputClass} pl-9 w-full sm:w-64`}
-            />
+          {/* Search + Departman filtresi */}
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <select
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+              className={`${inputClass} w-full sm:w-56`}
+              aria-label="Departman filtresi"
+            >
+              <option value={ALL_DEPARTMENTS}>Tüm departmanlar</option>
+              {departmentOptions().map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Ara..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className={`${inputClass} pl-9 w-full sm:w-64`}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -529,6 +593,9 @@ export const ReportsPage = () => {
                         <th className={thClass}>Departman</th>
                         <th className={thClass}>Giriş</th>
                         <th className={thClass}>Çıkış</th>
+                        <th className={thClass}>Mola Çıkış</th>
+                        <th className={thClass}>Mola Dönüş</th>
+                        <th className={thClass}>Mola Süresi</th>
                         <th className={thClass}>Süre</th>
                         <th className={thClass}>Durum</th>
                       </tr>
@@ -536,7 +603,7 @@ export const ReportsPage = () => {
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                       {filterByName(dailyData.records).length === 0 ? (
                         <tr>
-                          <td colSpan={6}>
+                          <td colSpan={9}>
                             <Empty text="Kayıt bulunamadı" />
                           </td>
                         </tr>
@@ -552,6 +619,9 @@ export const ReportsPage = () => {
                             <td className={tdClass}>{r.department || '-'}</td>
                             <td className={tdClass}>{formatTimeNullable(r.firstIn)}</td>
                             <td className={tdClass}>{formatTimeNullable(r.lastOut)}</td>
+                            <td className={tdClass}>{formatTimeNullable(r.lunchOut)}</td>
+                            <td className={tdClass}>{formatTimeNullable(r.lunchReturn)}</td>
+                            <td className={tdClass}>{fmtMinutes(r.lunchMinutes)}</td>
                             <td className={tdClass}>
                               {r.totalHours > 0 ? `${r.totalHours} sa` : '-'}
                             </td>
@@ -693,13 +763,14 @@ export const ReportsPage = () => {
                         <th className={`${thClass} text-center`}>Geç</th>
                         <th className={`${thClass} text-center`}>Erken Çıkma</th>
                         <th className={`${thClass} text-right`}>Toplam Saat</th>
+                        <th className={`${thClass} text-right`}>Toplam Mola</th>
                         <th className={`${thClass} text-right`}>Devam Oranı</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                       {filterByName(monthlyData.records).length === 0 ? (
                         <tr>
-                          <td colSpan={8}>
+                          <td colSpan={9}>
                             <Empty text="Kayıt bulunamadı" />
                           </td>
                         </tr>
@@ -752,6 +823,9 @@ export const ReportsPage = () => {
                               </span>
                             </td>
                             <td className={`${tdClass} text-right`}>{r.totalHours}</td>
+                            <td className={`${tdClass} text-right text-gray-500 dark:text-gray-400`}>
+                              {r.totalLunchHours > 0 ? r.totalLunchHours : '-'}
+                            </td>
                             <td className={`${tdClass} text-right`}>
                               <span
                                 className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${

@@ -95,6 +95,9 @@ interface DayResult {
   isLate: boolean;
   isEarly: boolean;
   punchCount: number;
+  lunchOut: Date | null;     // gercek punch (mola icin cikti) — yoksa null
+  lunchReturn: Date | null;  // gercek punch (moladan dondu) — yoksa null
+  lunchMinutes: number;      // calismadan dusulen mola dakikasi
 }
 
 /**
@@ -118,6 +121,9 @@ function processDayLogs(logs: AccessLog[], cfg: WorkConfig): DayResult {
       isLate: false,
       isEarly: false,
       punchCount: 0,
+      lunchOut: null,
+      lunchReturn: null,
+      lunchMinutes: 0,
     };
   }
 
@@ -129,9 +135,19 @@ function processDayLogs(logs: AccessLog[], cfg: WorkConfig): DayResult {
       : null;
 
   let totalMinutes = 0;
+  let lunchMinutes = 0;
+  let lunchOut: Date | null = null;
+  let lunchReturn: Date | null = null;
+
   if (firstIn && lastOut && lastOut > firstIn) {
     totalMinutes = (lastOut.getTime() - firstIn.getTime()) / 60000;
-    totalMinutes = Math.max(0, totalMinutes - lunchOverlapMinutes(firstIn, lastOut, cfg));
+    const nominal = lunchOverlapMinutes(firstIn, lastOut, cfg);
+    const actual = detectLunchGap(logs, cfg);
+    // Politika minimum nominal (1 saat); kisi daha uzun mola almissa daha cok dusulur.
+    lunchMinutes = Math.max(nominal, actual.actualMinutes);
+    lunchOut = actual.lunchOut;
+    lunchReturn = actual.lunchReturn;
+    totalMinutes = Math.max(0, totalMinutes - lunchMinutes);
   }
 
   return {
@@ -141,7 +157,52 @@ function processDayLogs(logs: AccessLog[], cfg: WorkConfig): DayResult {
     isLate: isLate(firstIn, cfg),
     isEarly: lastOut ? isEarly(lastOut, cfg, firstIn) : false,
     punchCount: logs.length,
+    lunchOut,
+    lunchReturn,
+    lunchMinutes,
   };
+}
+
+/**
+ * Gercek mola gap'ini tespit eder: ardisik iki log arasinda mola penceresiyle
+ * ortusen en buyuk araligi mola olarak isaretler. Kisi mola icinde hic kart
+ * okutmamissa gap yok → lunchOut/lunchReturn null doner; nominal dusum yine
+ * processDayLogs'da uygulanir.
+ */
+function detectLunchGap(
+  logs: AccessLog[],
+  cfg: WorkConfig,
+): { lunchOut: Date | null; lunchReturn: Date | null; actualMinutes: number } {
+  if (
+    !cfg.lunchEnabled ||
+    cfg.lunchStartMinutes == null ||
+    cfg.lunchEndMinutes == null ||
+    logs.length < 2
+  ) {
+    return { lunchOut: null, lunchReturn: null, actualMinutes: 0 };
+  }
+  let bestGap = 0;
+  let bestOut: Date | null = null;
+  let bestReturn: Date | null = null;
+  for (let i = 0; i < logs.length - 1; i++) {
+    const aTime = new Date(logs[i].eventTime);
+    const bTime = new Date(logs[i + 1].eventTime);
+    const aLocal = toLocal(aTime, cfg);
+    const bLocal = toLocal(bTime, cfg);
+    const aMin = aLocal.getUTCHours() * 60 + aLocal.getUTCMinutes();
+    const bMin = bLocal.getUTCHours() * 60 + bLocal.getUTCMinutes();
+    const overlap =
+      Math.min(bMin, cfg.lunchEndMinutes) - Math.max(aMin, cfg.lunchStartMinutes);
+    if (overlap > 0) {
+      const gap = bMin - aMin;
+      if (gap > bestGap) {
+        bestGap = gap;
+        bestOut = aTime;
+        bestReturn = bTime;
+      }
+    }
+  }
+  return { lunchOut: bestOut, lunchReturn: bestReturn, actualMinutes: bestGap };
 }
 
 /**
@@ -242,6 +303,9 @@ export class ReportsService {
         workStart: cfg.workStartLabel,
         workEnd: cfg.workEndLabel,
         isFlexible: cfg.isFlexible,
+        lunchOut: day.lunchOut?.toISOString() ?? null,
+        lunchReturn: day.lunchReturn?.toISOString() ?? null,
+        lunchMinutes: day.lunchMinutes,
       };
     });
 
@@ -308,6 +372,7 @@ export class ReportsService {
       let lateCount = 0;
       let earlyLeaveCount = 0;
       let totalMinutes = 0;
+      let totalLunchMinutes = 0;
 
       for (const [, dayLogs] of dayMap) {
         daysPresent++;
@@ -316,6 +381,7 @@ export class ReportsService {
         if (day.isLate) lateCount++;
         if (day.isEarly) earlyLeaveCount++;
         totalMinutes += day.totalMinutes;
+        totalLunchMinutes += day.lunchMinutes;
       }
 
       const attendanceRate =
@@ -333,6 +399,7 @@ export class ReportsService {
         lateCount,
         earlyLeaveCount,
         totalHours: Math.round((totalMinutes / 60) * 100) / 100,
+        totalLunchHours: Math.round((totalLunchMinutes / 60) * 100) / 100,
         attendanceRate,
       };
     });

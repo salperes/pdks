@@ -191,6 +191,55 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 076
+Rev. Date  : 03.06.2026
+Rev. Time  : 14:30:00
+Rev. Prompt: Raporlara mola cikis/donus saatleri + departman filtresi (UI + CSV)
+
+Rev. Report: (
+  Yeni ozellikler:
+
+  1) Ogle Molasi detayi gunluk raporda:
+     - "Mola Cikis" + "Mola Donus" + "Mola Suresi" yeni 3 kolon
+     - Backend processDayLogs ardisik loglar arasinda mola penceresiyle
+       ortusen en buyuk gap'i tespit eder (detectLunchGap helper)
+     - Dusum politikasi: max(nominal_overlap, actual_gap) — kisi 1 saatten
+       kisa mola almis olsa bile politika minimum 1 saat duser; daha uzun
+       mola yapmissa actual deger dusulur
+     - Kisi mola icinde hic kart okutmamissa Cikis/Donus null donulur ama
+       nominal dusum yine uygulanir
+
+  2) Aylik ozette "Toplam Mola" kolonu:
+     - Her gun dusulen lunchMinutes toplaminin saat karsiligi
+     - Personel bazinda gun gun aldigi molanin toplami
+
+  3) Departman filtresi (3 sekmeyi de kapsar):
+     - Header'da yeni "Tum departmanlar" / spesifik departman dropdown
+     - Aktif sekmenin record'larindan benzersiz departmanlar dinamik dolu
+     - Hem ekran tablosu hem CSV indirme ayni filtreyle calisir
+
+  BACKEND — reports.service.ts:
+  - DayResult interface: lunchOut, lunchReturn, lunchMinutes
+  - processDayLogs: detectLunchGap entegrasyonu + max dusum
+  - getDailyAttendance response: 3 yeni alan
+  - getMonthlySummary response: totalLunchHours
+
+  FRONTEND — pages/Reports/index.tsx:
+  - DailyRecord + MonthlyRecord interface yeni alanlar
+  - departmentFilter state + departmentOptions() helper
+  - Header'da departman dropdown ("Tum departmanlar" + dinamik liste)
+  - filterByName departmentFilter'i da uygular (her sekme icin)
+  - Daily tablo: 3 yeni kolon (Mola Cikis, Mola Donus, Mola Suresi)
+  - Monthly tablo: Toplam Mola kolonu
+  - exportDailyCSV: 3 yeni kolon, filterByName ile sinirli rows
+  - exportMonthlyCSV: 1 yeni kolon, filterByName ile sinirli rows
+  - exportDeptCSV: filterDeptByName ile sinirli rows
+  - fmtMinutes helper (saat/dakika formati)
+
+  Degisen dosyalar: 4 (reports.service.ts, Reports/index.tsx,
+    CHANGELOG, version.ts, CLAUDE.md)
+)
+---------------------------------------------------------
 Rev. ID    : 075
 Rev. Date  : 03.06.2026
 Rev. Time  : 10:45:00
