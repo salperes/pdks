@@ -191,6 +191,41 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 078
+Rev. Date  : 03.06.2026
+Rev. Time  : 16:40:00
+Rev. Prompt: Mola tespit penceresi: sabah ilk kapi gecisi yanlislikla mola sayilmasin
+
+Rev. Report: (
+  BUG: detectLunchGap "en buyuk gap" arayisi, sadece 1 dakika bile mola
+  penceresine degen DEV bir gap'i mola olarak isaretliyordu.
+
+  Ornek (Berat ASLAN):
+    08:03 (giris), 08:12 (ikinci gecis), 12:31 (mola cikis), 13:33 (son)
+    Eski algoritma: 08:12 → 12:31 gap'i (259 dk) [12:30, 13:30] mola
+    penceresine 1 dakika degdigi icin bestGap olarak secildi.
+    Sonuc: lunchOut=08:12, lunchReturn=12:31, mola "4 sa 19 dk" (yanlis).
+    Calisma suresi 1.18 sa olarak gosterildi.
+
+  FIX: Mola tespit penceresi eklendi.
+  - LUNCH_DETECTION_PADDING_MIN = 45
+  - Pencere = [lunchStart - 45, lunchEnd + 45]
+  - 12:30-13:30 mola icin tespit penceresi 11:45-14:15
+  - Log'lar once pencereye filtrelenir, sonra ardisik gap'lerden en buyuk
+    mola olarak kabul edilir
+  - Pencere disindaki sabah/aksam punch'lari mola gap'ine giremez
+
+  Berat icin yeni sonuc:
+    Pencere icindeki log'lar: 12:31, 13:33
+    lunchOut=12:31, lunchReturn=13:33, mola 62 dk
+    Calisma suresi = (13:33 - 08:03) - 62 dk = ~4.5 sa
+
+  Hem yon damgali (Teknokent) hem yon damgasiz (Fab) lokasyonlar icin
+  ayni mantik calisir; pencere filtresi gun basi/sonu punch'larini eler.
+
+  Degisen dosyalar: 3 (reports.service.ts, CHANGELOG, version.ts, CLAUDE.md)
+)
+---------------------------------------------------------
 Rev. ID    : 077
 Rev. Date  : 03.06.2026
 Rev. Time  : 15:10:00

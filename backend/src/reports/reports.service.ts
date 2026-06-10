@@ -163,11 +163,27 @@ function processDayLogs(logs: AccessLog[], cfg: WorkConfig): DayResult {
   };
 }
 
+// Mola tespit penceresi: nominal mola saatinin oncesine ve sonrasina 45 dk
+// padding. 12:30-13:30 mola icin tespit penceresi 11:45-14:15. Bu sayede
+// sabah ilk girisleri (orn. 08:12'de kapidan ikinci gecis) ya da ogleden
+// sonra geri donus sonrasi cikis (orn. 13:33) tek basina mola olarak
+// degerlendirilmez — sadece pencere icindeki ardisik punch'lar mola gap'i
+// olarak kabul edilir.
+const LUNCH_DETECTION_PADDING_MIN = 45;
+
 /**
- * Gercek mola gap'ini tespit eder: ardisik iki log arasinda mola penceresiyle
- * ortusen en buyuk araligi mola olarak isaretler. Kisi mola icinde hic kart
- * okutmamissa gap yok → lunchOut/lunchReturn null doner; nominal dusum yine
- * processDayLogs'da uygulanir.
+ * Gercek mola gap'ini tespit eder.
+ *
+ * 1. Once log'lar mola tespit penceresine ([lunchStart-45, lunchEnd+45])
+ *    filtrelenir. Pencere disindaki punch'lar (sabah girisi, aksam cikisi,
+ *    ara giris-cikislar) mola olarak sayilmaz.
+ * 2. Pencere icindeki ardisik log'lar arasindaki **en buyuk** gap = mola.
+ * 3. Hicbir punch yoksa veya tek punch varsa: lunchOut/Return null;
+ *    nominal dusum yine processDayLogs'da uygulanir.
+ *
+ * Bu mantik hem yon damgali (Teknokent) hem yon damgasiz (Fab) lokasyonlar
+ * icin dogru calisir cunku pencere kisitlamasiyla sabah/aksam pucht'lari
+ * eler.
  */
 function detectLunchGap(
   logs: AccessLog[],
@@ -181,25 +197,31 @@ function detectLunchGap(
   ) {
     return { lunchOut: null, lunchReturn: null, actualMinutes: 0 };
   }
+  const windowStart = cfg.lunchStartMinutes - LUNCH_DETECTION_PADDING_MIN;
+  const windowEnd = cfg.lunchEndMinutes + LUNCH_DETECTION_PADDING_MIN;
+
+  const inWindow: { time: Date; minute: number }[] = [];
+  for (const log of logs) {
+    const t = new Date(log.eventTime);
+    const local = toLocal(t, cfg);
+    const minute = local.getUTCHours() * 60 + local.getUTCMinutes();
+    if (minute >= windowStart && minute <= windowEnd) {
+      inWindow.push({ time: t, minute });
+    }
+  }
+  if (inWindow.length < 2) {
+    return { lunchOut: null, lunchReturn: null, actualMinutes: 0 };
+  }
+
   let bestGap = 0;
   let bestOut: Date | null = null;
   let bestReturn: Date | null = null;
-  for (let i = 0; i < logs.length - 1; i++) {
-    const aTime = new Date(logs[i].eventTime);
-    const bTime = new Date(logs[i + 1].eventTime);
-    const aLocal = toLocal(aTime, cfg);
-    const bLocal = toLocal(bTime, cfg);
-    const aMin = aLocal.getUTCHours() * 60 + aLocal.getUTCMinutes();
-    const bMin = bLocal.getUTCHours() * 60 + bLocal.getUTCMinutes();
-    const overlap =
-      Math.min(bMin, cfg.lunchEndMinutes) - Math.max(aMin, cfg.lunchStartMinutes);
-    if (overlap > 0) {
-      const gap = bMin - aMin;
-      if (gap > bestGap) {
-        bestGap = gap;
-        bestOut = aTime;
-        bestReturn = bTime;
-      }
+  for (let i = 0; i < inWindow.length - 1; i++) {
+    const gap = inWindow[i + 1].minute - inWindow[i].minute;
+    if (gap > bestGap) {
+      bestGap = gap;
+      bestOut = inWindow[i].time;
+      bestReturn = inWindow[i + 1].time;
     }
   }
   return { lunchOut: bestOut, lunchReturn: bestReturn, actualMinutes: bestGap };
