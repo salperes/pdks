@@ -191,6 +191,49 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 081
+Rev. Date  : 03.06.2026
+Rev. Time  : 19:30:00
+Rev. Prompt: Haftalik/Aylik raporlara "Detay (gun gun)" gorunumu
+
+Rev. Report: (
+  Haftalik ve Aylik raporlarda mevcut "Ozet" gorunumune ek olarak
+  "Detay (Gun Gun)" gorunumu. Detay: secilen range icin her gun × her
+  personel = bir satir, departman bazinda gunluk rapor formati (Tarih,
+  Departman, Personel, Giris, Cikis, Mola Cikis, Mola Donus, Mola Suresi,
+  Sure, Durum).
+
+  Hafta ici gunler (Pzt-Cuma): tum personel icin satir (gelmediyse
+  isPresent=false ile gosterilir). Hafta sonu (Cmt-Pazar): sadece kart
+  okutmus kisiler.
+
+  Siralama: tarih ASC > departman (TR) > ad soyad (TR). Tarih degistiginde
+  satira ust border eklenerek gunler arasi gorsel ayrim.
+
+  BACKEND — reports.service.ts:
+  - getWeeklyDetail(date): Pazartesi-Pazar 7 gun
+  - getMonthlyDetail(year, month): 1-son gun
+  - buildDetailReport(dates, ...) ortak private helper
+
+  BACKEND — reports.controller.ts:
+  - GET /reports/weekly-detail?date=YYYY-MM-DD
+  - GET /reports/monthly-detail?year=YYYY&month=M
+
+  FRONTEND — Reports/index.tsx:
+  - DetailRecord + DetailReport interface
+  - weeklyView / monthlyView state ('summary' | 'detail')
+  - weeklyDetailData / monthlyDetailData state
+  - fetchWeekly / fetchMonthly: Promise.all ile ozet + detay paralel cekme
+  - "Ozet | Detay" toggle button group filter bar'in icinde
+  - exportDetailCSV ortak helper (haftalik-detay-* / aylik-detay-*)
+  - renderDetailTable() ortak JSX helper, sticky header + grid lines,
+    gunler arasi ayirici cizgi, gelmeyenler opacity-60
+  - Sticky header + grid + scroll mirasi aynen calisir
+
+  Degisen dosyalar: 5 (reports.service.ts, reports.controller.ts,
+    Reports/index.tsx, CHANGELOG, version.ts, CLAUDE.md)
+)
+---------------------------------------------------------
 Rev. ID    : 080
 Rev. Date  : 03.06.2026
 Rev. Time  : 18:00:00

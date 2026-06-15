@@ -20,12 +20,25 @@ export class ReportsController {
     return this.reportsService.getWeeklySummary(date);
   }
 
+  @Get('weekly-detail')
+  getWeeklyDetail(@Query('date') date: string) {
+    return this.reportsService.getWeeklyDetail(date);
+  }
+
   @Get('monthly-summary')
   getMonthlySummary(
     @Query('year') year: string,
     @Query('month') month: string,
   ) {
     return this.reportsService.getMonthlySummary(+year, +month);
+  }
+
+  @Get('monthly-detail')
+  getMonthlyDetail(
+    @Query('year') year: string,
+    @Query('month') month: string,
+  ) {
+    return this.reportsService.getMonthlyDetail(+year, +month);
   }
 
   @Get('department-summary')

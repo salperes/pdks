@@ -587,6 +587,153 @@ export class ReportsService {
     };
   }
 
+  /* ── Detail (gun gun) Reports ──────────────────────── */
+
+  /**
+   * Haftalik detay raporu: secilen tarihin Pazartesi'sinden Pazar'a kadar
+   * her gun × her personel icin bir satir (gunluk rapor formati).
+   */
+  async getWeeklyDetail(dateStr: string) {
+    const { globalCfg, locationConfigs } = await this.getConfigs();
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const input = new Date(y, m - 1, d);
+    const dow = input.getDay();
+    const mondayOffset = dow === 0 ? -6 : 1 - dow;
+    const monday = new Date(input);
+    monday.setDate(monday.getDate() + mondayOffset);
+
+    const dates: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const dt = new Date(monday);
+      dt.setDate(dt.getDate() + i);
+      dates.push(
+        `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`,
+      );
+    }
+    return this.buildDetailReport(dates, globalCfg, locationConfigs);
+  }
+
+  /**
+   * Aylik detay raporu: secilen ayin 1'inden sonuna kadar her gun × her
+   * personel icin bir satir.
+   */
+  async getMonthlyDetail(year: number, month: number) {
+    const { globalCfg, locationConfigs } = await this.getConfigs();
+    const lastDay = new Date(year, month, 0).getDate();
+    const dates: string[] = [];
+    for (let day = 1; day <= lastDay; day++) {
+      dates.push(`${year}-${pad2(month)}-${pad2(day)}`);
+    }
+    return this.buildDetailReport(dates, globalCfg, locationConfigs);
+  }
+
+  /**
+   * Detay rapor ortak builder'i:
+   *   - Hafta ici gunler (Pzt-Cuma): tum personel icin satir (gelmediyse
+   *     isPresent=false, firstIn/lastOut null).
+   *   - Hafta sonu (Cmt-Pazar): sadece kart okutmus kisiler icin satir.
+   * Siralama: tarih ASC > departman (TR) > ad soyad (TR).
+   */
+  private async buildDetailReport(
+    dates: string[],
+    globalCfg: ReturnType<SettingsService['buildWorkConfig']>,
+    locationConfigs: Map<string, ReturnType<SettingsService['buildWorkConfig']>>,
+  ) {
+    const startStr = dates[0];
+    const endStr = dates[dates.length - 1];
+    const rangeStart = new Date(`${startStr}T00:00:00${globalCfg.tzStr}`);
+    const rangeEnd = new Date(`${endStr}T23:59:59.999${globalCfg.tzStr}`);
+
+    const [allPersonnel, logs] = await Promise.all([
+      this.personnelRepo
+        .createQueryBuilder('p')
+        .where('p.isActive = :a', { a: true })
+        .orderBy('p.firstName COLLATE "tr-TR-x-icu"', 'ASC')
+        .addOrderBy('p.lastName COLLATE "tr-TR-x-icu"', 'ASC')
+        .getMany(),
+      this.logRepo
+        .createQueryBuilder('log')
+        .where('log.personnelId IS NOT NULL')
+        .andWhere('log.eventTime >= :s', { s: rangeStart })
+        .andWhere('log.eventTime <= :e', { e: rangeEnd })
+        .orderBy('log.eventTime', 'ASC')
+        .getMany(),
+    ]);
+
+    const byPersonDay = new Map<string, Map<string, AccessLog[]>>();
+    for (const log of logs) {
+      const pid = log.personnelId;
+      const dk = dateKey(new Date(log.eventTime), globalCfg);
+      if (!byPersonDay.has(pid)) byPersonDay.set(pid, new Map());
+      const dayMap = byPersonDay.get(pid)!;
+      const arr = dayMap.get(dk) ?? [];
+      arr.push(log);
+      dayMap.set(dk, arr);
+    }
+
+    const records: any[] = [];
+    let presentCount = 0;
+
+    for (const ds of dates) {
+      const [yy, mm, dd] = ds.split('-').map(Number);
+      const dt = new Date(yy, mm - 1, dd);
+      const jsDow = dt.getDay(); // 0=Pazar, 6=Cmt
+      const isWeekend = jsDow === 0 || jsDow === 6;
+
+      for (const p of allPersonnel) {
+        const dayLogs = byPersonDay.get(p.id)?.get(ds) ?? [];
+        const isPresent = dayLogs.length > 0;
+        if (isWeekend && !isPresent) continue;
+
+        const cfg = resolveConfigForLogs(dayLogs, locationConfigs, globalCfg);
+        const day = processDayLogs(dayLogs, cfg);
+        if (isPresent) presentCount++;
+
+        records.push({
+          personnelId: p.id,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          department: p.department || '',
+          date: ds,
+          dayOfWeek: jsDow === 0 ? 7 : jsDow, // ISO: 1=Pzt..7=Pazar
+          firstIn: day.firstIn?.toISOString() ?? null,
+          lastOut: day.lastOut?.toISOString() ?? null,
+          lunchOut: day.lunchOut?.toISOString() ?? null,
+          lunchReturn: day.lunchReturn?.toISOString() ?? null,
+          lunchMinutes: day.lunchMinutes,
+          totalHours: Math.round((day.totalMinutes / 60) * 100) / 100,
+          isPresent,
+          isLate: day.isLate,
+          isEarlyLeave: day.isEarly,
+          punchCount: day.punchCount,
+        });
+      }
+    }
+
+    records.sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      const dc = a.department.localeCompare(b.department, 'tr');
+      if (dc !== 0) return dc;
+      return `${a.firstName} ${a.lastName}`.localeCompare(
+        `${b.firstName} ${b.lastName}`,
+        'tr',
+      );
+    });
+
+    return {
+      startDate: startStr,
+      endDate: endStr,
+      workStart: globalCfg.workStartLabel,
+      workEnd: globalCfg.workEndLabel,
+      records,
+      summary: {
+        totalPersonnel: allPersonnel.length,
+        totalDayRecords: records.length,
+        presentRecords: presentCount,
+      },
+    };
+  }
+
   /* ── Department Summary ───────────────────────────── */
 
   async getDepartmentSummary(startDateStr: string, endDateStr: string) {

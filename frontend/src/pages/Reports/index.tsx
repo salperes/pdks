@@ -49,6 +49,38 @@ interface DailyReport {
   };
 }
 
+interface DetailRecord {
+  personnelId: string;
+  firstName: string;
+  lastName: string;
+  department: string;
+  date: string;        // YYYY-MM-DD
+  dayOfWeek: number;   // 1=Pzt, 7=Pazar
+  firstIn: string | null;
+  lastOut: string | null;
+  lunchOut: string | null;
+  lunchReturn: string | null;
+  lunchMinutes: number;
+  totalHours: number;
+  isPresent: boolean;
+  isLate: boolean;
+  isEarlyLeave: boolean;
+  punchCount: number;
+}
+
+interface DetailReport {
+  startDate: string;
+  endDate: string;
+  workStart: string;
+  workEnd: string;
+  records: DetailRecord[];
+  summary: {
+    totalPersonnel: number;
+    totalDayRecords: number;
+    presentRecords: number;
+  };
+}
+
 interface WeeklyRecord {
   personnelId: string;
   firstName: string;
@@ -221,6 +253,16 @@ const fmtMinutes = (m: number) => {
   return `${h} sa ${mm} dk`;
 };
 
+const TR_MONTHS_SHORT = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+const TR_DAYS_SHORT = ['', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+
+const fmtDateShort = (yyyymmdd: string) => {
+  const parts = yyyymmdd.split('-').map(Number);
+  const m = parts[1];
+  const d = parts[2];
+  return `${String(d).padStart(2, '0')} ${TR_MONTHS_SHORT[m - 1]}`;
+};
+
 export const ReportsPage = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('daily');
   const [search, setSearch] = useState('');
@@ -234,12 +276,16 @@ export const ReportsPage = () => {
   // ─── Weekly state ───
   const [weekDate, setWeekDate] = useState(todays());
   const [weeklyData, setWeeklyData] = useState<WeeklyReport | null>(null);
+  const [weeklyDetailData, setWeeklyDetailData] = useState<DetailReport | null>(null);
   const [weeklyLoading, setWeeklyLoading] = useState(false);
+  const [weeklyView, setWeeklyView] = useState<'summary' | 'detail'>('summary');
 
   // ─── Monthly state ───
   const [monthVal, setMonthVal] = useState(thisMonth());
   const [monthlyData, setMonthlyData] = useState<MonthlyReport | null>(null);
+  const [monthlyDetailData, setMonthlyDetailData] = useState<DetailReport | null>(null);
   const [monthlyLoading, setMonthlyLoading] = useState(false);
+  const [monthlyView, setMonthlyView] = useState<'summary' | 'detail'>('summary');
 
   // ─── Department state ───
   const [deptStart, setDeptStart] = useState(monthStart());
@@ -266,12 +312,15 @@ export const ReportsPage = () => {
   const fetchWeekly = useCallback(async () => {
     setWeeklyLoading(true);
     try {
-      const res = await api.get<WeeklyReport>('/reports/weekly-summary', {
-        params: { date: weekDate },
-      });
-      setWeeklyData(res.data);
+      const [sumRes, detRes] = await Promise.all([
+        api.get<WeeklyReport>('/reports/weekly-summary', { params: { date: weekDate } }),
+        api.get<DetailReport>('/reports/weekly-detail', { params: { date: weekDate } }),
+      ]);
+      setWeeklyData(sumRes.data);
+      setWeeklyDetailData(detRes.data);
     } catch {
       setWeeklyData(null);
+      setWeeklyDetailData(null);
     } finally {
       setWeeklyLoading(false);
     }
@@ -281,12 +330,15 @@ export const ReportsPage = () => {
     setMonthlyLoading(true);
     try {
       const [y, m] = monthVal.split('-').map(Number);
-      const res = await api.get<MonthlyReport>('/reports/monthly-summary', {
-        params: { year: y, month: m },
-      });
-      setMonthlyData(res.data);
+      const [sumRes, detRes] = await Promise.all([
+        api.get<MonthlyReport>('/reports/monthly-summary', { params: { year: y, month: m } }),
+        api.get<DetailReport>('/reports/monthly-detail', { params: { year: y, month: m } }),
+      ]);
+      setMonthlyData(sumRes.data);
+      setMonthlyDetailData(detRes.data);
     } catch {
       setMonthlyData(null);
+      setMonthlyDetailData(null);
     } finally {
       setMonthlyLoading(false);
     }
@@ -340,6 +392,50 @@ export const ReportsPage = () => {
       r.isEarlyLeave ? 'Evet' : 'Hayır',
     ]);
     downloadCSV(`gunluk-devam-${dailyData.date}.csv`, headers, rows);
+  };
+
+  const exportDetailCSV = (
+    data: DetailReport,
+    filenamePrefix: string,
+  ) => {
+    const headers = [
+      'Tarih',
+      'Gün',
+      'Ad',
+      'Soyad',
+      'Departman',
+      'Giriş',
+      'Çıkış',
+      'Mola Çıkış',
+      'Mola Dönüş',
+      'Mola Süresi (dk)',
+      'Süre (saat)',
+      'Durum',
+      'Geç Kaldı',
+      'Erken Çıktı',
+    ];
+    const dayNames = ['', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+    const rows = filterByName(data.records).map((r) => [
+      r.date,
+      dayNames[r.dayOfWeek] || '',
+      r.firstName,
+      r.lastName,
+      r.department || '-',
+      formatTimeNullable(r.firstIn),
+      formatTimeNullable(r.lastOut),
+      formatTimeNullable(r.lunchOut),
+      formatTimeNullable(r.lunchReturn),
+      String(r.lunchMinutes || 0),
+      String(r.totalHours),
+      r.isPresent ? 'Geldi' : 'Gelmedi',
+      r.isLate ? 'Evet' : 'Hayır',
+      r.isEarlyLeave ? 'Evet' : 'Hayır',
+    ]);
+    downloadCSV(
+      `${filenamePrefix}-${data.startDate}_${data.endDate}.csv`,
+      headers,
+      rows,
+    );
   };
 
   const exportWeeklyCSV = () => {
@@ -506,6 +602,92 @@ export const ReportsPage = () => {
     'inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50';
   const inputClass =
     'rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0078d4] focus:border-transparent';
+
+  /* Detay tablo render helper'i — haftalik/aylik detay icin paylasilan */
+  const renderDetailTable = (data: DetailReport) => {
+    const rows = filterByName(data.records);
+    if (rows.length === 0) return <Empty text="Kayıt bulunamadı" />;
+    let lastDate = '';
+    return (
+      <div className={scrollWrap}>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className={stickyHead + ' border-b border-gray-200 dark:border-gray-700'}>
+              <th className={thClass}>Tarih</th>
+              <th className={thClass}>Departman</th>
+              <th className={thClass}>Personel</th>
+              <th className={thClass}>Giriş</th>
+              <th className={thClass}>Çıkış</th>
+              <th className={thClass}>Mola Çıkış</th>
+              <th className={thClass}>Mola Dönüş</th>
+              <th className={thClass}>Mola Süresi</th>
+              <th className={`${thClass} text-right`}>Süre</th>
+              <th className={thClass}>Durum</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+            {rows.map((r, i) => {
+              const isFirstOfDate = r.date !== lastDate;
+              lastDate = r.date;
+              return (
+                <tr
+                  key={`${r.personnelId}-${r.date}-${i}`}
+                  className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                    isFirstOfDate ? 'border-t-2 border-t-gray-300 dark:border-t-gray-600' : ''
+                  } ${!r.isPresent ? 'opacity-60' : ''}`}
+                >
+                  <td className={`${tdClass} whitespace-nowrap`}>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {fmtDateShort(r.date)}
+                    </span>{' '}
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {TR_DAYS_SHORT[r.dayOfWeek]}
+                    </span>
+                  </td>
+                  <td className={tdClass}>{r.department || '-'}</td>
+                  <td className={`${tdClass} font-medium text-gray-900 dark:text-white`}>
+                    {r.firstName} {r.lastName}
+                  </td>
+                  <td className={tdClass}>{formatTimeNullable(r.firstIn)}</td>
+                  <td className={tdClass}>{formatTimeNullable(r.lastOut)}</td>
+                  <td className={tdClass}>{formatTimeNullable(r.lunchOut)}</td>
+                  <td className={tdClass}>{formatTimeNullable(r.lunchReturn)}</td>
+                  <td className={tdClass}>{fmtMinutes(r.lunchMinutes)}</td>
+                  <td className={`${tdClass} text-right`}>
+                    {r.totalHours > 0 ? `${r.totalHours} sa` : '-'}
+                  </td>
+                  <td className={tdClass}>
+                    <div className="flex flex-wrap gap-1">
+                      {!r.isPresent && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400">
+                          <XCircle className="w-3 h-3" /> Gelmedi
+                        </span>
+                      )}
+                      {r.isPresent && !r.isLate && !r.isEarlyLeave && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
+                          <CheckCircle className="w-3 h-3" /> Geldi
+                        </span>
+                      )}
+                      {r.isLate && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+                          <AlertTriangle className="w-3 h-3" /> Geç
+                        </span>
+                      )}
+                      {r.isEarlyLeave && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400">
+                          <Clock className="w-3 h-3" /> Erken
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
 
   /* ────────────────────────────────────── */
   /* ────────────── RENDER ──────────────── */
@@ -782,8 +964,31 @@ export const ReportsPage = () => {
                 )}
                 Sorgula
               </button>
-              {weeklyData && (
+              {/* Özet / Detay görünüm geçişi */}
+              {(weeklyData || weeklyDetailData) && (
+                <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden text-sm">
+                  <button
+                    onClick={() => setWeeklyView('summary')}
+                    className={`px-3 py-2 ${weeklyView === 'summary' ? 'bg-[#0078d4] text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                  >
+                    Özet
+                  </button>
+                  <button
+                    onClick={() => setWeeklyView('detail')}
+                    className={`px-3 py-2 ${weeklyView === 'detail' ? 'bg-[#0078d4] text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                  >
+                    Detay (Gün Gün)
+                  </button>
+                </div>
+              )}
+              {weeklyView === 'summary' && weeklyData && (
                 <button onClick={exportWeeklyCSV} className={btnOutline}>
+                  <Download className="w-4 h-4" />
+                  CSV İndir
+                </button>
+              )}
+              {weeklyView === 'detail' && weeklyDetailData && (
+                <button onClick={() => exportDetailCSV(weeklyDetailData, 'haftalik-detay')} className={btnOutline}>
                   <Download className="w-4 h-4" />
                   CSV İndir
                 </button>
@@ -797,8 +1002,8 @@ export const ReportsPage = () => {
             </div>
           </div>
 
-          {/* Summary mini-cards */}
-          {weeklyData && (
+          {/* Summary mini-cards (sadece Özet görünümünde) */}
+          {weeklyData && weeklyView === 'summary' && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <StatCard
                 icon={Users}
@@ -827,7 +1032,32 @@ export const ReportsPage = () => {
             </div>
           )}
 
-          {/* Table */}
+          {/* Detail view: tum gunler icin ozet kartlar */}
+          {weeklyDetailData && weeklyView === 'detail' && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <StatCard
+                icon={Users}
+                label="Toplam Personel"
+                value={weeklyDetailData.summary.totalPersonnel}
+                color="bg-[#0078d4]"
+              />
+              <StatCard
+                icon={Calendar}
+                label="Toplam Gün Kaydı"
+                value={weeklyDetailData.summary.totalDayRecords}
+                color="bg-indigo-500"
+              />
+              <StatCard
+                icon={CheckCircle}
+                label="Gelen Gün Kaydı"
+                value={weeklyDetailData.summary.presentRecords}
+                color="bg-emerald-500"
+              />
+            </div>
+          )}
+
+          {/* Tablo — view'a gore Ozet veya Detay */}
+          {weeklyView === 'summary' && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             {weeklyLoading ? (
               <Spinner />
@@ -936,6 +1166,27 @@ export const ReportsPage = () => {
               </>
             )}
           </div>
+          )}
+
+          {/* Detail tablo */}
+          {weeklyView === 'detail' && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+              {weeklyLoading ? (
+                <Spinner />
+              ) : !weeklyDetailData ? (
+                <Empty text="Tarih seçip Sorgula butonuna tıklayın" />
+              ) : (
+                <>
+                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      {fmtDateLabel(weeklyDetailData.startDate)} – {fmtDateLabel(weeklyDetailData.endDate)} — Haftalık Detay (Gün × Personel)
+                    </h3>
+                  </div>
+                  {renderDetailTable(weeklyDetailData)}
+                </>
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -968,8 +1219,30 @@ export const ReportsPage = () => {
                 )}
                 Sorgula
               </button>
-              {monthlyData && (
+              {(monthlyData || monthlyDetailData) && (
+                <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden text-sm">
+                  <button
+                    onClick={() => setMonthlyView('summary')}
+                    className={`px-3 py-2 ${monthlyView === 'summary' ? 'bg-[#0078d4] text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                  >
+                    Özet
+                  </button>
+                  <button
+                    onClick={() => setMonthlyView('detail')}
+                    className={`px-3 py-2 ${monthlyView === 'detail' ? 'bg-[#0078d4] text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                  >
+                    Detay (Gün Gün)
+                  </button>
+                </div>
+              )}
+              {monthlyView === 'summary' && monthlyData && (
                 <button onClick={exportMonthlyCSV} className={btnOutline}>
+                  <Download className="w-4 h-4" />
+                  CSV İndir
+                </button>
+              )}
+              {monthlyView === 'detail' && monthlyDetailData && (
+                <button onClick={() => exportDetailCSV(monthlyDetailData, 'aylik-detay')} className={btnOutline}>
                   <Download className="w-4 h-4" />
                   CSV İndir
                 </button>
@@ -983,8 +1256,8 @@ export const ReportsPage = () => {
             </div>
           </div>
 
-          {/* Summary mini-cards */}
-          {monthlyData && (
+          {/* Summary mini-cards (Özet) */}
+          {monthlyData && monthlyView === 'summary' && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <StatCard
                 icon={Users}
@@ -1013,7 +1286,32 @@ export const ReportsPage = () => {
             </div>
           )}
 
-          {/* Table */}
+          {/* Detail mini-cards */}
+          {monthlyDetailData && monthlyView === 'detail' && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <StatCard
+                icon={Users}
+                label="Toplam Personel"
+                value={monthlyDetailData.summary.totalPersonnel}
+                color="bg-[#0078d4]"
+              />
+              <StatCard
+                icon={Calendar}
+                label="Toplam Gün Kaydı"
+                value={monthlyDetailData.summary.totalDayRecords}
+                color="bg-indigo-500"
+              />
+              <StatCard
+                icon={CheckCircle}
+                label="Gelen Gün Kaydı"
+                value={monthlyDetailData.summary.presentRecords}
+                color="bg-emerald-500"
+              />
+            </div>
+          )}
+
+          {/* Table (Özet) */}
+          {monthlyView === 'summary' && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             {monthlyLoading ? (
               <Spinner />
@@ -1122,6 +1420,27 @@ export const ReportsPage = () => {
               </>
             )}
           </div>
+          )}
+
+          {/* Detail tablo */}
+          {monthlyView === 'detail' && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+              {monthlyLoading ? (
+                <Spinner />
+              ) : !monthlyDetailData ? (
+                <Empty text="Ay seçip Sorgula butonuna tıklayın" />
+              ) : (
+                <>
+                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      {fmtDateLabel(monthlyDetailData.startDate)} – {fmtDateLabel(monthlyDetailData.endDate)} — Aylık Detay (Gün × Personel)
+                    </h3>
+                  </div>
+                  {renderDetailTable(monthlyDetailData)}
+                </>
+              )}
+            </div>
+          )}
         </>
       )}
 
