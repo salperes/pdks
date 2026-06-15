@@ -49,6 +49,35 @@ interface DailyReport {
   };
 }
 
+interface WeeklyRecord {
+  personnelId: string;
+  firstName: string;
+  lastName: string;
+  department: string;
+  daysPresent: number;
+  daysAbsent: number;
+  lateCount: number;
+  earlyLeaveCount: number;
+  totalHours: number;
+  totalLunchHours: number;
+  attendanceRate: number;
+}
+
+interface WeeklyReport {
+  startDate: string;
+  endDate: string;
+  workDays: number;
+  workStart: string;
+  workEnd: string;
+  records: WeeklyRecord[];
+  summary: {
+    totalPersonnel: number;
+    avgAttendanceRate: number;
+    totalLate: number;
+    totalEarlyLeave: number;
+  };
+}
+
 interface MonthlyRecord {
   personnelId: string;
   firstName: string;
@@ -95,7 +124,7 @@ interface DepartmentReport {
   records: DepartmentRecord[];
 }
 
-type TabKey = 'daily' | 'monthly' | 'department';
+type TabKey = 'daily' | 'weekly' | 'monthly' | 'department';
 
 /* ────────────────── helpers ────────────────── */
 
@@ -202,6 +231,11 @@ export const ReportsPage = () => {
   const [dailyData, setDailyData] = useState<DailyReport | null>(null);
   const [dailyLoading, setDailyLoading] = useState(false);
 
+  // ─── Weekly state ───
+  const [weekDate, setWeekDate] = useState(todays());
+  const [weeklyData, setWeeklyData] = useState<WeeklyReport | null>(null);
+  const [weeklyLoading, setWeeklyLoading] = useState(false);
+
   // ─── Monthly state ───
   const [monthVal, setMonthVal] = useState(thisMonth());
   const [monthlyData, setMonthlyData] = useState<MonthlyReport | null>(null);
@@ -228,6 +262,20 @@ export const ReportsPage = () => {
       setDailyLoading(false);
     }
   }, [dailyDate]);
+
+  const fetchWeekly = useCallback(async () => {
+    setWeeklyLoading(true);
+    try {
+      const res = await api.get<WeeklyReport>('/reports/weekly-summary', {
+        params: { date: weekDate },
+      });
+      setWeeklyData(res.data);
+    } catch {
+      setWeeklyData(null);
+    } finally {
+      setWeeklyLoading(false);
+    }
+  }, [weekDate]);
 
   const fetchMonthly = useCallback(async () => {
     setMonthlyLoading(true);
@@ -292,6 +340,39 @@ export const ReportsPage = () => {
       r.isEarlyLeave ? 'Evet' : 'Hayır',
     ]);
     downloadCSV(`gunluk-devam-${dailyData.date}.csv`, headers, rows);
+  };
+
+  const exportWeeklyCSV = () => {
+    if (!weeklyData) return;
+    const headers = [
+      'Ad',
+      'Soyad',
+      'Departman',
+      'Gelen Gün',
+      'Devamsız',
+      'Geç Kalma',
+      'Erken Çıkma',
+      'Toplam Saat',
+      'Toplam Mola (saat)',
+      'Devam Oranı (%)',
+    ];
+    const rows = filterByName(weeklyData.records).map((r) => [
+      r.firstName,
+      r.lastName,
+      r.department || '-',
+      String(r.daysPresent),
+      String(r.daysAbsent),
+      String(r.lateCount),
+      String(r.earlyLeaveCount),
+      String(r.totalHours),
+      String(r.totalLunchHours ?? 0),
+      String(r.attendanceRate),
+    ]);
+    downloadCSV(
+      `haftalik-ozet-${weeklyData.startDate}_${weeklyData.endDate}.csv`,
+      headers,
+      rows,
+    );
   };
 
   const exportMonthlyCSV = () => {
@@ -388,6 +469,7 @@ export const ReportsPage = () => {
   const departmentOptions = (): string[] => {
     let src: { department: string }[] = [];
     if (activeTab === 'daily' && dailyData) src = dailyData.records;
+    else if (activeTab === 'weekly' && weeklyData) src = weeklyData.records;
     else if (activeTab === 'monthly' && monthlyData) src = monthlyData.records;
     else if (activeTab === 'department' && deptData) src = deptData.records;
     const set = new Set<string>();
@@ -402,6 +484,7 @@ export const ReportsPage = () => {
 
   const tabs: { key: TabKey; label: string; icon: typeof BarChart3 }[] = [
     { key: 'daily', label: 'Günlük Devam', icon: Calendar },
+    { key: 'weekly', label: 'Haftalık Özet', icon: Calendar },
     { key: 'monthly', label: 'Aylık Özet', icon: Clock },
     { key: 'department', label: 'Departman Analizi', icon: Building2 },
   ];
@@ -658,6 +741,191 @@ export const ReportsPage = () => {
                                   </span>
                                 )}
                               </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── WEEKLY TAB ── */}
+      {activeTab === 'weekly' && (
+        <>
+          {/* Filter bar */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                  Hafta İçi Tarih
+                </label>
+                <DateInput
+                  value={weekDate}
+                  onChange={(v) => setWeekDate(v)}
+                  className={inputClass}
+                />
+              </div>
+              <button
+                onClick={fetchWeekly}
+                disabled={weeklyLoading}
+                className={btnPrimary}
+              >
+                {weeklyLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+                Sorgula
+              </button>
+              {weeklyData && (
+                <button onClick={exportWeeklyCSV} className={btnOutline}>
+                  <Download className="w-4 h-4" />
+                  CSV İndir
+                </button>
+              )}
+              {weeklyData && (
+                <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">
+                  Hafta: {fmtDateLabel(weeklyData.startDate)} – {fmtDateLabel(weeklyData.endDate)}
+                  {' | '}İş günü: {weeklyData.workDays} | Mesai: {weeklyData.workStart} - {weeklyData.workEnd}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Summary mini-cards */}
+          {weeklyData && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <StatCard
+                icon={Users}
+                label="Toplam Personel"
+                value={weeklyData.summary.totalPersonnel}
+                color="bg-[#0078d4]"
+              />
+              <StatCard
+                icon={CheckCircle}
+                label="Ort. Devam Oranı"
+                value={`%${weeklyData.summary.avgAttendanceRate}`}
+                color="bg-emerald-500"
+              />
+              <StatCard
+                icon={AlertTriangle}
+                label="Toplam Geç Kalma"
+                value={weeklyData.summary.totalLate}
+                color="bg-amber-500"
+              />
+              <StatCard
+                icon={Clock}
+                label="Toplam Erken Çıkma"
+                value={weeklyData.summary.totalEarlyLeave}
+                color="bg-orange-500"
+              />
+            </div>
+          )}
+
+          {/* Table */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {weeklyLoading ? (
+              <Spinner />
+            ) : !weeklyData ? (
+              <Empty text="Tarih seçip Sorgula butonuna tıklayın" />
+            ) : (
+              <>
+                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    {fmtDateLabel(weeklyData.startDate)} – {fmtDateLabel(weeklyData.endDate)} — Haftalık Devam Özeti
+                  </h3>
+                </div>
+                <div className={scrollWrap}>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className={stickyHead + " border-b border-gray-200 dark:border-gray-700"}>
+                        <th className={thClass}>Personel</th>
+                        <th className={thClass}>Departman</th>
+                        <th className={`${thClass} text-center`}>Gelen Gün</th>
+                        <th className={`${thClass} text-center`}>Devamsız</th>
+                        <th className={`${thClass} text-center`}>Geç</th>
+                        <th className={`${thClass} text-center`}>Erken Çıkma</th>
+                        <th className={`${thClass} text-right`}>Toplam Saat</th>
+                        <th className={`${thClass} text-right`}>Toplam Mola</th>
+                        <th className={`${thClass} text-right`}>Devam Oranı</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                      {filterByName(weeklyData.records).length === 0 ? (
+                        <tr>
+                          <td colSpan={9}>
+                            <Empty text="Kayıt bulunamadı" />
+                          </td>
+                        </tr>
+                      ) : (
+                        filterByName(weeklyData.records).map((r) => (
+                          <tr
+                            key={r.personnelId}
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                          >
+                            <td className={`${tdClass} font-medium text-gray-900 dark:text-white`}>
+                              {r.firstName} {r.lastName}
+                            </td>
+                            <td className={tdClass}>{r.department || '-'}</td>
+                            <td className={`${tdClass} text-center`}>
+                              <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                                {r.daysPresent}
+                              </span>
+                            </td>
+                            <td className={`${tdClass} text-center`}>
+                              <span
+                                className={
+                                  r.daysAbsent > 0
+                                    ? 'font-medium text-red-600 dark:text-red-400'
+                                    : ''
+                                }
+                              >
+                                {r.daysAbsent}
+                              </span>
+                            </td>
+                            <td className={`${tdClass} text-center`}>
+                              <span
+                                className={
+                                  r.lateCount > 0
+                                    ? 'font-medium text-amber-600 dark:text-amber-400'
+                                    : ''
+                                }
+                              >
+                                {r.lateCount}
+                              </span>
+                            </td>
+                            <td className={`${tdClass} text-center`}>
+                              <span
+                                className={
+                                  r.earlyLeaveCount > 0
+                                    ? 'font-medium text-orange-600 dark:text-orange-400'
+                                    : ''
+                                }
+                              >
+                                {r.earlyLeaveCount}
+                              </span>
+                            </td>
+                            <td className={`${tdClass} text-right`}>{r.totalHours}</td>
+                            <td className={`${tdClass} text-right text-gray-500 dark:text-gray-400`}>
+                              {r.totalLunchHours > 0 ? r.totalLunchHours : '-'}
+                            </td>
+                            <td className={`${tdClass} text-right`}>
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                  r.attendanceRate >= 90
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
+                                    : r.attendanceRate >= 70
+                                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                                      : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
+                                }`}
+                              >
+                                %{r.attendanceRate}
+                              </span>
                             </td>
                           </tr>
                         ))

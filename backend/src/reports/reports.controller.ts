@@ -15,6 +15,11 @@ export class ReportsController {
     return this.reportsService.getDailyAttendance(date);
   }
 
+  @Get('weekly-summary')
+  getWeeklySummary(@Query('date') date: string) {
+    return this.reportsService.getWeeklySummary(date);
+  }
+
   @Get('monthly-summary')
   getMonthlySummary(
     @Query('year') year: string,

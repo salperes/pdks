@@ -191,6 +191,43 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 080
+Rev. Date  : 03.06.2026
+Rev. Time  : 18:00:00
+Rev. Prompt: Raporlara Haftalik Ozet sekmesi eklendi
+
+Rev. Report: (
+  Raporlar sayfasinda yeni "Haftalik Ozet" sekmesi (Gunluk ile Aylik
+  arasinda). Aylik ozetin haftalik versiyonu — secilen tarihin icinde
+  bulundugu Pazartesi-Pazar haftasi icin agregasyon yapar.
+
+  BACKEND:
+  - reports.service.ts: getWeeklySummary(dateStr) — input tarihin
+    Pazartesi'sini hesaplar, 7 gunluk range icin per-person aggregation
+    (gun gun processDayLogs cagrir, daysPresent + late + earlyLeave +
+    totalHours + totalLunchHours toplar). Mantik getMonthlySummary ile
+    aynidir, sadece range farklidir (monthly bozulmamasi icin paralel
+    kod).
+  - reports.controller.ts: GET /reports/weekly-summary?date=YYYY-MM-DD
+
+  FRONTEND — Reports/index.tsx:
+  - TabKey'e 'weekly' eklendi, sekme sirasi: Gunluk | Haftalik | Aylik |
+    Departman
+  - WeeklyRecord + WeeklyReport interface'leri (MonthlyRecord ile ayni
+    sekil)
+  - weekDate state + fetchWeekly + exportWeeklyCSV
+  - departmentOptions() weekly destegi
+  - Yeni "Haftalik Ozet" tab content: DateInput + Sorgula + CSV indir,
+    4 ozet karti, monthly ile ayni 9 kolonlu tablo
+  - "Hafta: 03 Haz - 09 Haz 2026" label gosterilir
+  - filterByName departmanlar weekly icin de calisir
+
+  Sadece UI eklemesi — diger sekmeler, CSV'ler etkilenmedi.
+
+  Degisen dosyalar: 5 (reports.service.ts, reports.controller.ts,
+    Reports/index.tsx, CHANGELOG, version.ts, CLAUDE.md)
+)
+---------------------------------------------------------
 Rev. ID    : 079
 Rev. Date  : 03.06.2026
 Rev. Time  : 17:20:00

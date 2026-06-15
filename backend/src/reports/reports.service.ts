@@ -468,6 +468,125 @@ export class ReportsService {
     };
   }
 
+  /* ── Weekly Summary ───────────────────────────────── */
+
+  /**
+   * Hafta ozet raporu. dateStr'in icinde bulundugu ISO haftasini (Pazartesi
+   * baslangic) baz alir. Aggregation mantigi getMonthlySummary ile birebir
+   * — sadece range farkli.
+   */
+  async getWeeklySummary(dateStr: string) {
+    const { globalCfg, locationConfigs } = await this.getConfigs();
+
+    // dateStr'in icinde bulundugu Pazartesi'yi bul (lokal tarih)
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const input = new Date(y, m - 1, d);
+    const dow = input.getDay(); // 0=Pazar, 1=Pzt, ..., 6=Cmt
+    const mondayOffset = dow === 0 ? -6 : 1 - dow;
+    const monday = new Date(input);
+    monday.setDate(monday.getDate() + mondayOffset);
+    const sunday = new Date(monday);
+    sunday.setDate(sunday.getDate() + 6);
+
+    const startStr = `${monday.getFullYear()}-${pad2(monday.getMonth() + 1)}-${pad2(monday.getDate())}`;
+    const endStr = `${sunday.getFullYear()}-${pad2(sunday.getMonth() + 1)}-${pad2(sunday.getDate())}`;
+
+    const rangeStart = new Date(`${startStr}T00:00:00${globalCfg.tzStr}`);
+    const rangeEnd = new Date(`${endStr}T23:59:59.999${globalCfg.tzStr}`);
+    const workDays = workDaysInRange(startStr, endStr);
+
+    const [allPersonnel, logs] = await Promise.all([
+      this.personnelRepo
+        .createQueryBuilder('p')
+        .where('p.isActive = :a', { a: true })
+        .orderBy('p.firstName COLLATE "tr-TR-x-icu"', 'ASC')
+        .addOrderBy('p.lastName COLLATE "tr-TR-x-icu"', 'ASC')
+        .getMany(),
+      this.logRepo
+        .createQueryBuilder('log')
+        .where('log.personnelId IS NOT NULL')
+        .andWhere('log.eventTime >= :s', { s: rangeStart })
+        .andWhere('log.eventTime <= :e', { e: rangeEnd })
+        .orderBy('log.eventTime', 'ASC')
+        .getMany(),
+    ]);
+
+    const byPersonDay = new Map<string, Map<string, AccessLog[]>>();
+    for (const log of logs) {
+      const pid = log.personnelId;
+      const dk = dateKey(new Date(log.eventTime), globalCfg);
+      if (!byPersonDay.has(pid)) byPersonDay.set(pid, new Map());
+      const dayMap = byPersonDay.get(pid)!;
+      const arr = dayMap.get(dk) ?? [];
+      arr.push(log);
+      dayMap.set(dk, arr);
+    }
+
+    const records = allPersonnel.map((p) => {
+      const dayMap = byPersonDay.get(p.id) ?? new Map();
+      let daysPresent = 0;
+      let lateCount = 0;
+      let earlyLeaveCount = 0;
+      let totalMinutes = 0;
+      let totalLunchMinutes = 0;
+
+      for (const [, dayLogs] of dayMap) {
+        daysPresent++;
+        const cfg = resolveConfigForLogs(dayLogs, locationConfigs, globalCfg);
+        const day = processDayLogs(dayLogs, cfg);
+        if (day.isLate) lateCount++;
+        if (day.isEarly) earlyLeaveCount++;
+        totalMinutes += day.totalMinutes;
+        totalLunchMinutes += day.lunchMinutes;
+      }
+
+      const attendanceRate =
+        workDays > 0
+          ? Math.round((daysPresent / workDays) * 10000) / 100
+          : 0;
+
+      return {
+        personnelId: p.id,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        department: p.department || '',
+        daysPresent,
+        daysAbsent: workDays - daysPresent,
+        lateCount,
+        earlyLeaveCount,
+        totalHours: Math.round((totalMinutes / 60) * 100) / 100,
+        totalLunchHours: Math.round((totalLunchMinutes / 60) * 100) / 100,
+        attendanceRate,
+      };
+    });
+
+    const totalLate = records.reduce((s, r) => s + r.lateCount, 0);
+    const totalEarly = records.reduce((s, r) => s + r.earlyLeaveCount, 0);
+    const avgRate =
+      records.length > 0
+        ? Math.round(
+            (records.reduce((s, r) => s + r.attendanceRate, 0) /
+              records.length) *
+              100,
+          ) / 100
+        : 0;
+
+    return {
+      startDate: startStr,
+      endDate: endStr,
+      workDays,
+      workStart: globalCfg.workStartLabel,
+      workEnd: globalCfg.workEndLabel,
+      records,
+      summary: {
+        totalPersonnel: allPersonnel.length,
+        avgAttendanceRate: avgRate,
+        totalLate,
+        totalEarlyLeave: totalEarly,
+      },
+    };
+  }
+
   /* ── Department Summary ───────────────────────────── */
 
   async getDepartmentSummary(startDateStr: string, endDateStr: string) {
