@@ -634,7 +634,7 @@ export const ReportsPage = () => {
                   key={`${r.personnelId}-${r.date}-${i}`}
                   className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
                     isFirstOfDate ? 'border-t-2 border-t-gray-300 dark:border-t-gray-600' : ''
-                  } ${!r.isPresent ? 'opacity-60' : ''}`}
+                  }`}
                 >
                   <td className={`${tdClass} whitespace-nowrap`}>
                     <span className="font-medium text-gray-900 dark:text-white">

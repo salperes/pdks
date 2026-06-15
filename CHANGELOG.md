@@ -191,6 +191,26 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 082
+Rev. Date  : 03.06.2026
+Rev. Time  : 20:00:00
+Rev. Prompt: Detay raporda gelmeyen satirlardaki opacity-60 kaldirildi
+
+Rev. Report: (
+  Detay rapor tablosunda gelmeyen (isPresent=false) satirlara opacity-60
+  uygulaniyordu. Bu yazi kalinligini teknik olarak degistirmiyor ama
+  gorsel olarak ince/silik gosteriyor (kullanici "bold/normal farkli"
+  diye not etti).
+
+  Durum kolonunda zaten "Gelmedi" rozeti var, ek dimming gereksiz.
+  Tum satirlar artik ayni tonda, gelmeyenler sadece Durum kolonundaki
+  kirmizi rozetle ayirt edilir.
+
+  Sadece frontend renderDetailTable, tek className temizligi.
+
+  Degisen dosyalar: 3 (Reports/index.tsx, CHANGELOG, version.ts, CLAUDE.md)
+)
+---------------------------------------------------------
 Rev. ID    : 081
 Rev. Date  : 03.06.2026
 Rev. Time  : 19:30:00
