@@ -191,6 +191,23 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 083
+Rev. Date  : 03.06.2026
+Rev. Time  : 20:25:00
+Rev. Prompt: Detay raporda ust ozet kartlar kaldirildi - yer israfi
+
+Rev. Report: (
+  Haftalik/Aylik Detay gorunumlerinde tabloyu asagi iten 3 ozet karti
+  (Toplam Personel, Toplam Gun Kaydi, Gelen Gun Kaydi) kaldirildi. Detay
+  gorunumde tablonun kendisi zaten tum bilgiyi tasiyor.
+
+  Ozet gorunumde kartlar yerinde duruyor.
+
+  Sadece frontend, 2 div bloku silindi.
+
+  Degisen dosyalar: 3 (Reports/index.tsx, CHANGELOG, version.ts, CLAUDE.md)
+)
+---------------------------------------------------------
 Rev. ID    : 082
 Rev. Date  : 03.06.2026
 Rev. Time  : 20:00:00

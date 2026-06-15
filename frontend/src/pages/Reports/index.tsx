@@ -1032,30 +1032,6 @@ export const ReportsPage = () => {
             </div>
           )}
 
-          {/* Detail view: tum gunler icin ozet kartlar */}
-          {weeklyDetailData && weeklyView === 'detail' && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <StatCard
-                icon={Users}
-                label="Toplam Personel"
-                value={weeklyDetailData.summary.totalPersonnel}
-                color="bg-[#0078d4]"
-              />
-              <StatCard
-                icon={Calendar}
-                label="Toplam Gün Kaydı"
-                value={weeklyDetailData.summary.totalDayRecords}
-                color="bg-indigo-500"
-              />
-              <StatCard
-                icon={CheckCircle}
-                label="Gelen Gün Kaydı"
-                value={weeklyDetailData.summary.presentRecords}
-                color="bg-emerald-500"
-              />
-            </div>
-          )}
-
           {/* Tablo — view'a gore Ozet veya Detay */}
           {weeklyView === 'summary' && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -1282,30 +1258,6 @@ export const ReportsPage = () => {
                 label="Toplam Erken Çıkma"
                 value={monthlyData.summary.totalEarlyLeave}
                 color="bg-orange-500"
-              />
-            </div>
-          )}
-
-          {/* Detail mini-cards */}
-          {monthlyDetailData && monthlyView === 'detail' && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <StatCard
-                icon={Users}
-                label="Toplam Personel"
-                value={monthlyDetailData.summary.totalPersonnel}
-                color="bg-[#0078d4]"
-              />
-              <StatCard
-                icon={Calendar}
-                label="Toplam Gün Kaydı"
-                value={monthlyDetailData.summary.totalDayRecords}
-                color="bg-indigo-500"
-              />
-              <StatCard
-                icon={CheckCircle}
-                label="Gelen Gün Kaydı"
-                value={monthlyDetailData.summary.presentRecords}
-                color="bg-emerald-500"
               />
             </div>
           )}
