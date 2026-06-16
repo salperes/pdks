@@ -678,6 +678,11 @@ export const ReportsPage = () => {
                           <Clock className="w-3 h-3" /> Erken
                         </span>
                       )}
+                      {r.isPresent && !r.lastOut && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-400">
+                          <AlertTriangle className="w-3 h-3" /> Eksik Çıkış
+                        </span>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -920,6 +925,12 @@ export const ReportsPage = () => {
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400">
                                     <Clock className="w-3 h-3" />
                                     Erken Çıktı
+                                  </span>
+                                )}
+                                {r.isPresent && !r.lastOut && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-400">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    Eksik Çıkış
                                   </span>
                                 )}
                               </div>

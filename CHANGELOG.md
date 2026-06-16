@@ -191,6 +191,29 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 085
+Rev. Date  : 16.06.2026
+Rev. Time  : 10:00:00
+Rev. Prompt: Tek punch / eksik cikis durumu icin "Eksik Cikis" rozeti
+
+Rev. Report: (
+  Kisi o gun yalnizca 1 punch atmissa (orn. Musa Caner OZAN 12.06.2026:
+  17:44 Fabrika 1 tek punch) lastOut=null oluyor, total=0 sa. UI'da
+  yaniltici sekilde sadece "Geldi" rozeti gosteriliyordu. Operator
+  bu gunleri kolay taramak istiyor.
+
+  FIX: Gunluk rapor ve Haftalik/Aylik Detay tablolarinda r.isPresent &&
+  !r.lastOut ise sari/amber "Eksik Cikis" rozeti goster. Mevcut "Geldi"
+  rozetinin yaninda — kisi geldi ama cikis kaydi yok bilgisi net olur.
+
+  Bu bir algoritma duzeltmesi degil veri eksikligine isaret. Algoritma
+  tek punch'tan giris+cikis cikaramaz, durum hala dogru raporlaniyor.
+
+  Sadece frontend, status badge eklemesi (2 yerde: daily + renderDetailTable).
+
+  Degisen dosyalar: 3 (Reports/index.tsx, CHANGELOG, version.ts, CLAUDE.md)
+)
+---------------------------------------------------------
 Rev. ID    : 084
 Rev. Date  : 16.06.2026
 Rev. Time  : 09:30:00
