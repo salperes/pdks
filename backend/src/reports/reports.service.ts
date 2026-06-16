@@ -129,10 +129,28 @@ function processDayLogs(logs: AccessLog[], cfg: WorkConfig): DayResult {
 
   const firstIn = new Date(logs[0].eventTime);
   const lastLog = logs[logs.length - 1];
-  const lastOut =
-    logs.length > 1 && lastLog.direction !== 'in'
-      ? new Date(lastLog.eventTime)
-      : null;
+  // lastOut karari:
+  //   - Son log 'out' damgali → o
+  //   - Son log 'in' damgali → daha onceki en gec 'out' damgali log (kisi
+  //     cikis yapip kapida geri donmus olabilir). Hic 'out' yoksa null.
+  //   - Son log yon damgasiz (Fab 'both') → son log (Rev 074 hibrit kurali —
+  //     karisik ortamlarda Fabrika cikisi atlanmasin).
+  let lastOut: Date | null = null;
+  if (logs.length > 1) {
+    if (lastLog.direction === 'out') {
+      lastOut = new Date(lastLog.eventTime);
+    } else if (lastLog.direction === 'in') {
+      for (let i = logs.length - 2; i >= 0; i--) {
+        if (logs[i].direction === 'out') {
+          lastOut = new Date(logs[i].eventTime);
+          break;
+        }
+      }
+    } else {
+      // direction null/both — son log direkt
+      lastOut = new Date(lastLog.eventTime);
+    }
+  }
 
   let totalMinutes = 0;
   let lunchMinutes = 0;

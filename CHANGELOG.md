@@ -191,6 +191,38 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 084
+Rev. Date  : 16.06.2026
+Rev. Time  : 09:30:00
+Rev. Prompt: Son log 'in' damgali ise: daha onceki en gec 'out' lastOut sayilsin
+
+Rev. Report: (
+  BUG: Direction-aware lokasyonda (Teknokent in/out kapi ciftleri) kisi
+  gunun son anlarinda cikis yapip kapidan birkac saniye sonra geri girisi
+  yaparsa, son log 'in' damgali oluyor. Rev 074'teki kati kural "son log
+  'in' ise lastOut=null" bu durumda gunun cikisini gizliyor.
+
+  Ornek (Ali Bircan, 12 Haziran 2026):
+    Log akisi: 07:44 in ... (Merkez Ofis in/out kapi ciftleri) ...
+    17:41:45 out, 17:47:17 out, 17:47:29 out, 17:47:34 in
+    Eski algoritma: son log 17:47:34 'in' → lastOut=null → cikis
+    gorunmuyor → calisma suresi 0 sa.
+
+  FIX: processDayLogs lastOut karari rafine edildi.
+  - Son log 'out' damgali → o
+  - Son log 'in' damgali → logs'ta geri yurudugumuzde rastlanan ilk
+    'out' (en gec out) lastOut olur. Hicbir 'out' yoksa null (kisi
+    gercekten ilk girisinden beri icerde).
+  - Son log yon damgasiz (Fab 'both') → son log direkt (Rev 074 hibrit
+    davranisi korunur, karisik Teknokent+Fab senaryosu kirilmiyor).
+
+  Ali Bircan icin yeni sonuc:
+    lastOut = 17:47:29 (en gec out)
+    Calisma = (17:47:29 − 07:44:29) − mola = ~9 saat
+
+  Degisen dosyalar: 3 (reports.service.ts, CHANGELOG, version.ts, CLAUDE.md)
+)
+---------------------------------------------------------
 Rev. ID    : 083
 Rev. Date  : 03.06.2026
 Rev. Time  : 20:25:00
