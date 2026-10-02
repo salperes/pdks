@@ -20,7 +20,10 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // SSO isteğinin 401'i refresh/yönlendirme tetiklememeli — hata login formunda gösterilir
+    const isSsoRequest = typeof originalRequest?.url === 'string' && originalRequest.url.includes('/auth/sso');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isSsoRequest) {
       originalRequest._retry = true;
 
       try {

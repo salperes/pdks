@@ -191,6 +191,41 @@ Rev. Report: (
   Değişen dosyalar: 1 (backend/access-logs/access-logs.service.ts)
 )
 ---------------------------------------------------------
+Rev. ID    : 086
+Rev. Date  : 02.10.2026
+Rev. Time  : 10:45:00
+Rev. Prompt: Portal SSO: kayitli oturum varken sso_token yok sayiliyordu
+
+Rev. Report: (
+  Portal PDKS'i /?sso_token=<jwt> ile aciyor. Tarayicida persist edilmis
+  oturum (pdks-auth isAuthenticated=true) varsa ProtectedRoute dogrudan
+  uygulamayi aciyor, sso_token yok sayiliyordu (prod log 02.10 05:17:30:
+  GET /?sso_token=... -> 401 -> /auth/refresh; /auth/sso cagrisi yok).
+  Refresh token da dolmussa kullanici sifre formuna dusuyor, portal linkine
+  ikinci kez tiklamasi gerekiyordu. Ayrica BASKA kullanicinin eski oturumu
+  portalin SSO kimligine sessizce galip gelebiliyordu.
+
+  FIX (sadece frontend):
+  - utils/sso.ts (yeni): saf karar fonksiyonlari (getSsoToken,
+    shouldRedirectToLogin, shouldLeaveLoginPage, resolvePostLoginTarget)
+  - App.tsx ProtectedRoute: URL'de sso_token varsa oturumdan bagimsiz
+    /login?sso_token=... yonlendirmesi (state.from = hedef sayfa)
+  - Login: SSO once calisir; eski token/persist durum temizlenir (logout),
+    token URL'den silinir, SSO surerken /login otomatik yonlendirme yapmaz,
+    basarida hedef sayfaya gider; hata login formunda mesajla gosterilir
+  - services/api.ts: /auth/sso 401'i refresh/yonlendirme tetiklemez
+    (hata mesaji kaybolmasin, dongu olmasin)
+  Mevcut yollar (sifreli giris, sso_token'siz acilis) degismedi.
+
+  Dogrulama: saf fonksiyon assert kontrolleri + vite preview uzerinde
+  Playwright (API mock): eski kullanici oturumu + sso_token -> /auth/sso 1 kez,
+  yeni kullanici token'lari, / sayfasi; gecersiz token -> /login + hata
+  mesaji, refresh/dongu yok; sso_token'siz acilis -> degisiklik yok.
+
+  Degisen dosyalar: App.tsx, pages/Login/index.tsx, services/api.ts,
+  utils/sso.ts (yeni), CHANGELOG, version.ts, CLAUDE.md
+)
+---------------------------------------------------------
 Rev. ID    : 085
 Rev. Date  : 16.06.2026
 Rev. Time  : 10:00:00

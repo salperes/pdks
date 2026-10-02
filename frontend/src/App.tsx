@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './store/authStore';
+import { shouldRedirectToLogin } from './utils/sso';
 import { Layout } from './components/layout/Layout';
 import { LoginPage } from './pages/Login';
 import { DashboardPage } from './pages/Dashboard';
@@ -30,10 +31,11 @@ const queryClient = new QueryClient({
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuthStore();
   const location = useLocation();
-  if (!isAuthenticated) {
+  // sso_token varsa kayıtlı oturumdan bağımsız olarak önce SSO işlenir
+  if (shouldRedirectToLogin(isAuthenticated, location.search)) {
     // SSO token parametresini login sayfasına taşı
     const loginPath = location.search ? `/login${location.search}` : '/login';
-    return <Navigate to={loginPath} replace />;
+    return <Navigate to={loginPath} replace state={{ from: location.pathname }} />;
   }
   return <>{children}</>;
 };

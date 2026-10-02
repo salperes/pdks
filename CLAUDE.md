@@ -1,6 +1,6 @@
 # PDKS - Personel Devam Kontrol Sistemi
 
-## Mevcut Versiyon: 1.0.085
+## Mevcut Versiyon: 1.0.086
 
 ## Proje Ozeti
 ZKTeco SC403 kart okuyucu terminallerle entegre personel devam kontrol sistemi.

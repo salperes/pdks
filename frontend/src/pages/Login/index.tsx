@@ -1,30 +1,42 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
+import { getSsoToken, shouldLeaveLoginPage, resolvePostLoginTarget } from '../../utils/sso';
 
 export const LoginPage = () => {
   const { login, isAuthenticated, isLoading, error, clearError } = useAuthStore();
+  const location = useLocation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [ssoLoading, setSsoLoading] = useState(false);
+  // URL'de sso_token varsa ilk render'dan itibaren SSO "devam ediyor" sayılır
+  const [ssoLoading, setSsoLoading] = useState(() => !!getSsoToken(window.location.search));
   const [ssoError, setSsoError] = useState<string | null>(null);
   const ssoAttempted = useRef(false);
+  // SSO sonrası dönülecek hedef (ProtectedRoute'un state.from'u); SSO yoksa '/' (mevcut davranış)
+  const [ssoTarget] = useState(() =>
+    getSsoToken(window.location.search)
+      ? resolvePostLoginTarget((location.state as { from?: unknown } | null)?.from)
+      : '/',
+  );
 
-  // SSO token yakalama — Portal'dan gelen sso_token parametresini işle
+  // SSO token yakalama — Portal'dan gelen sso_token parametresini işle.
+  // Kayıtlı (persist) oturum olsa bile önce SSO yapılır: eski oturum veya
+  // başka bir kullanıcının oturumu portalın kimliğine galip gelmemeli.
   useEffect(() => {
     if (ssoAttempted.current) return;
-    const params = new URLSearchParams(window.location.search);
-    const ssoToken = params.get('sso_token');
+    const ssoToken = getSsoToken(window.location.search);
     if (!ssoToken) return;
 
     ssoAttempted.current = true;
-    setSsoLoading(true);
-    setSsoError(null);
+    // ssoLoading ilk render'da zaten true (useState başlangıcı)
+
+    // Eski oturumu temizle (token'lar + persist edilmiş durum)
+    useAuthStore.getState().logout();
 
     // URL'den token parametresini temizle (replay koruması)
-    window.history.replaceState({}, '', window.location.pathname);
+    window.history.replaceState(window.history.state, '', window.location.pathname);
 
     api.get('/auth/sso', { params: { sso_token: ssoToken } })
       .then((res) => {
@@ -37,11 +49,11 @@ export const LoginPage = () => {
         setSsoError(err.response?.data?.message || 'SSO giriş başarısız');
       })
       .finally(() => setSsoLoading(false));
-  }, [isAuthenticated]);
+  }, []);
 
-  // SSO token varsa önce onu işle (stale isAuthenticated'ı atla)
-  const hasSsoToken = new URLSearchParams(window.location.search).get('sso_token');
-  if (isAuthenticated && !hasSsoToken) return <Navigate to="/" replace />;
+  if (shouldLeaveLoginPage(isAuthenticated, window.location.search, ssoLoading)) {
+    return <Navigate to={ssoTarget} replace />;
+  }
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
